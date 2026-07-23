@@ -1,1 +1,1 @@
-# Multi-Vendor-E-commerce-Platform
+# ShopStack : Enterprise Multi-Vendor E-Commerce Platform
