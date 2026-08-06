@@ -23,19 +23,22 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final VendorRepository vendorRepository;
     private final ProductRepository productRepository;
+    private final InventoryHistoryRepository inventoryHistoryRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
                             CartItemRepository cartItemRepository,
                             CustomerRepository customerRepository,
                             VendorRepository vendorRepository,
-                            ProductRepository productRepository) {
+                            ProductRepository productRepository,
+                            InventoryHistoryRepository inventoryHistoryRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
         this.customerRepository = customerRepository;
         this.vendorRepository = vendorRepository;
         this.productRepository = productRepository;
+        this.inventoryHistoryRepository = inventoryHistoryRepository;
     }
 
     @Override
@@ -66,8 +69,18 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // Deduct stock quantity
-            product.setStockQuantity(product.getStockQuantity() - cartItem.getQuantity());
+            int newStock = product.getStockQuantity() - cartItem.getQuantity();
+            product.setStockQuantity(newStock);
             productRepository.save(product);
+
+            // Record inventory history
+            InventoryHistory history = new InventoryHistory(
+                    product,
+                    -cartItem.getQuantity(),
+                    newStock,
+                    "ORDER_CHECKOUT"
+            );
+            inventoryHistoryRepository.save(history);
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             total = total.add(itemTotal);

@@ -1,58 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
-import { setProducts, setCategories, setLoading, setError } from '../store/slices/productSlice';
+import { fetchCategories, fetchCatalogProducts, setFilters, resetFilters } from '../store/slices/productSlice';
 import { setCartItems } from '../store/slices/cartSlice';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
 import ProductCard from '../components/ProductCard';
-import { Search, Filter, RefreshCw, ShoppingBag, Layers, SlidersHorizontal } from 'lucide-react';
+import {
+  Search,
+  Filter,
+  RefreshCw,
+  ShoppingBag,
+  SlidersHorizontal,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  X
+} from 'lucide-react';
 
 const ProductCatalogPage = () => {
   const dispatch = useDispatch();
-  const { products, categories, loading } = useSelector((state) => state.products);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const { products, categories, loading, categoryLoading, categoryError, pagination, filters } = useSelector((state) => state.products);
   const { items: wishlistItems } = useSelector((state) => state.wishlist);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCat, setSelectedCat] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [searchTerm, setSearchTerm] = useState(filters.search || searchParams.get('search') || '');
+  const [selectedCat, setSelectedCat] = useState(filters.categoryId || searchParams.get('category') || '');
+  const [brandFilter, setBrandFilter] = useState(filters.brand || '');
+  const [minPrice, setMinPrice] = useState(filters.minPrice || '');
+  const [maxPrice, setMaxPrice] = useState(filters.maxPrice || '');
+  const [ratingFilter, setRatingFilter] = useState(filters.rating || '');
+  const [sortBy, setSortBy] = useState(filters.sort || searchParams.get('sort') || 'newest');
+  const [currentPage, setCurrentPage] = useState(0);
+
   const [toastMessage, setToastMessage] = useState('');
 
-  const fetchCategories = async () => {
-    try {
-      const response = await axiosClient.get('/categories');
-      dispatch(setCategories(response.data));
-    } catch (err) {
-      console.error('Failed to load categories', err);
-    }
-  };
-
-  const fetchProducts = async () => {
-    dispatch(setLoading(true));
-    try {
-      const params = {};
-      if (searchTerm) params.search = searchTerm;
-      if (selectedCat) params.categoryId = selectedCat;
-      if (minPrice) params.minPrice = minPrice;
-      if (maxPrice) params.maxPrice = maxPrice;
-
-      const response = await axiosClient.get('/products', { params });
-      dispatch(setProducts(response.data));
-    } catch (err) {
-      dispatch(setError(err.response?.data?.message || 'Failed to fetch product catalog'));
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
-
+  // Initial category & product fetch
   useEffect(() => {
-    fetchCategories();
-    fetchProducts();
-  }, []);
+    dispatch(fetchCategories());
+  }, [dispatch]);
+
+  // Handle URL query parameters if present
+  useEffect(() => {
+    const urlCategory = searchParams.get('category');
+    const urlSort = searchParams.get('sort');
+    const urlSearch = searchParams.get('search');
+
+    if (urlCategory) setSelectedCat(urlCategory);
+    if (urlSort) setSortBy(urlSort);
+    if (urlSearch) setSearchTerm(urlSearch);
+
+    loadProducts(
+      urlCategory || selectedCat,
+      brandFilter,
+      urlSearch || searchTerm,
+      minPrice,
+      maxPrice,
+      ratingFilter,
+      urlSort || sortBy,
+      currentPage
+    );
+  }, [searchParams, currentPage]);
+
+  const loadProducts = (cat, brand, search, minP, maxP, rating, sort, page) => {
+    const params = {
+      page: page,
+      size: 12,
+      sort: sort || 'newest'
+    };
+    if (cat) params.categoryId = cat;
+    if (brand) params.brand = brand;
+    if (search) params.search = search;
+    if (minP) params.minPrice = minP;
+    if (maxP) params.maxPrice = maxP;
+    if (rating) params.rating = rating;
+
+    dispatch(fetchCatalogProducts(params));
+  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    fetchProducts();
+    setCurrentPage(0);
+    loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedCat('');
+    setBrandFilter('');
+    setMinPrice('');
+    setMaxPrice('');
+    setRatingFilter('');
+    setSortBy('newest');
+    setCurrentPage(0);
+    setSearchParams({});
+    dispatch(resetFilters());
+    loadProducts('', '', '', '', '', '', 'newest', 0);
   };
 
   const handleAddToCart = async (productId) => {
@@ -84,8 +128,11 @@ const ProductCatalogPage = () => {
 
   const wishlistedIds = new Set(wishlistItems.map((item) => item.product?.id));
 
+  // Extract unique brands from current products list for brand filter
+  const uniqueBrands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)));
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Toast Alert */}
         {toastMessage && (
@@ -99,110 +146,171 @@ const ProductCatalogPage = () => {
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-10 rounded-3xl border border-indigo-500/20 shadow-2xl">
           <div className="relative z-10 max-w-3xl space-y-3">
             <div className="inline-flex items-center space-x-2 px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-semibold border border-indigo-500/30">
-              <Layers className="w-3.5 h-3.5" />
-              <span>Multi-Vendor Marketplace Catalog</span>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Multi-Vendor Product Catalog</span>
             </div>
             <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-              Explore Premium <span className="text-indigo-400">Products</span>
+              Explore Enterprise <span className="text-indigo-400">Products</span>
             </h1>
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-              Browse verified items from trusted vendors with real-time stock management, transparent pricing, and instant checkout.
+              Filter by category, brand, price, or rating. All items feature real-time inventory management and vendor verification.
             </p>
           </div>
         </div>
 
-        {/* Search & Filter Bar */}
-        <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-4">
-          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-            {/* Search Input */}
-            <div className="lg:col-span-5 relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                <Search className="w-4 h-4" />
-              </span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products by title or brand..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
+        {/* Advanced Filters & Search Header */}
+        <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+          <form onSubmit={handleSearchSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+              {/* Search Bar */}
+              <div className="lg:col-span-4 relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                  <Search className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search title, brand, or keywords..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <div className="lg:col-span-3">
+                <select
+                  value={selectedCat}
+                  onChange={(e) => {
+                    setSelectedCat(e.target.value);
+                    setCurrentPage(0);
+                    loadProducts(e.target.value, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  disabled={categoryLoading}
+                >
+                  <option value="">{categoryLoading ? 'Loading categories...' : 'All Categories'}</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {categoryError && (
+                  <p className="text-xs text-rose-400 mt-1">⚠ {categoryError}</p>
+                )}
+              </div>
+
+              {/* Brand Filter */}
+              <div className="lg:col-span-2">
+                <select
+                  value={brandFilter}
+                  onChange={(e) => {
+                    setBrandFilter(e.target.value);
+                    setCurrentPage(0);
+                    loadProducts(selectedCat, e.target.value, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">All Brands</option>
+                  {uniqueBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By Dropdown */}
+              <div className="lg:col-span-3">
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setCurrentPage(0);
+                    loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, e.target.value, 0);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="newest">Sort: Newest Arrivals</option>
+                  <option value="price_asc">Sort: Price (Low &rarr; High)</option>
+                  <option value="price_desc">Sort: Price (High &rarr; Low)</option>
+                  <option value="rating_desc">Sort: Highest Rated</option>
+                </select>
+              </div>
             </div>
 
-            {/* Category Filter */}
-            <div className="lg:col-span-3">
-              <select
-                value={selectedCat}
-                onChange={(e) => setSelectedCat(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Price & Rating Sub-filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-12 gap-3 pt-2 border-t border-slate-800/80 items-center">
+              <div className="lg:col-span-3 flex items-center space-x-2">
+                <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Price:</span>
+                <input
+                  type="number"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  placeholder="Min $"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+                <span className="text-slate-500">-</span>
+                <input
+                  type="number"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  placeholder="Max $"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
 
-            {/* Min Price */}
-            <div className="lg:col-span-2">
-              <input
-                type="number"
-                value={minPrice}
-                onChange={(e) => setMinPrice(e.target.value)}
-                placeholder="Min Price ($)"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+              {/* Rating Filter */}
+              <div className="lg:col-span-3">
+                <select
+                  value={ratingFilter}
+                  onChange={(e) => {
+                    setRatingFilter(e.target.value);
+                    setCurrentPage(0);
+                    loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, e.target.value, sortBy, 0);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Rating: Any</option>
+                  <option value="4.5">4.5+ Stars ★★★★½</option>
+                  <option value="4.0">4.0+ Stars ★★★★☆</option>
+                  <option value="3.5">3.5+ Stars ★★★½☆</option>
+                </select>
+              </div>
 
-            {/* Max Price */}
-            <div className="lg:col-span-2">
-              <input
-                type="number"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                placeholder="Max Price ($)"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+              {/* Submit & Reset Buttons */}
+              <div className="lg:col-span-6 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer flex items-center space-x-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
+                </button>
 
-            {/* Submit Filter Button */}
-            <div className="lg:col-span-12 flex items-center justify-end space-x-3 pt-2 border-t border-slate-800/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedCat('');
-                  setMinPrice('');
-                  setMaxPrice('');
-                  fetchProducts();
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                Reset Filters
-              </button>
-
-              <button
-                type="submit"
-                className="flex items-center space-x-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md cursor-pointer transition-all"
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>Apply Filters</span>
-              </button>
+                <button
+                  type="submit"
+                  className="flex items-center space-x-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md cursor-pointer transition-all"
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Apply Filters</span>
+                </button>
+              </div>
             </div>
           </form>
         </div>
 
-        {/* Product Grid */}
+        {/* Product Grid Header */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white flex items-center">
-              <SlidersHorizontal className="w-5 h-5 mr-2 text-indigo-400" />
-              Available Products ({products.length})
+              <ShoppingBag className="w-5 h-5 mr-2 text-indigo-400" />
+              Products Found ({pagination.totalElements || products.length})
             </h2>
 
             <button
-              onClick={fetchProducts}
+              onClick={() => loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, currentPage)}
               className="p-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-slate-300 transition-all cursor-pointer"
               title="Refresh Products"
             >
@@ -210,18 +318,30 @@ const ProductCatalogPage = () => {
             </button>
           </div>
 
+          {/* Skeleton Loaders during loading state */}
           {loading ? (
-            <div className="text-center py-20 space-y-4">
-              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-slate-400 text-sm">Loading multi-vendor product catalog...</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={idx} className="bg-slate-900/60 border border-slate-800 rounded-2xl h-80 animate-pulse p-5 space-y-4">
+                  <div className="h-44 bg-slate-800/80 rounded-xl"></div>
+                  <div className="h-4 bg-slate-800/80 rounded w-3/4"></div>
+                  <div className="h-4 bg-slate-800/80 rounded w-1/2"></div>
+                </div>
+              ))}
             </div>
           ) : products.length === 0 ? (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
-              <ShoppingBag className="w-12 h-12 text-slate-600 mx-auto" />
-              <h3 className="text-lg font-bold text-white">No products found</h3>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-16 text-center space-y-4">
+              <ShoppingBag className="w-14 h-14 text-slate-600 mx-auto" />
+              <h3 className="text-xl font-bold text-white">No products found</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                No items match your search or filter criteria. Try adjusting your search keywords or resetting price range filters.
+                No items match your selected filters. Try clearing search terms or selecting different categories.
               </p>
+              <button
+                onClick={handleResetFilters}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-500 transition-all cursor-pointer inline-block"
+              >
+                Clear All Filters
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -234,6 +354,33 @@ const ProductCatalogPage = () => {
                   isWishlisted={wishlistedIds.has(product.id)}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Pagination Bar */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-3 pt-10">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                disabled={currentPage === 0}
+                className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-all"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <span className="text-xs font-semibold text-slate-400">
+                Page <span className="text-white font-bold">{currentPage + 1}</span> of <span className="text-white font-bold">{pagination.totalPages}</span>
+              </span>
+
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages - 1))}
+                disabled={currentPage >= pagination.totalPages - 1}
+                className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-all"
+                title="Next Page"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
           )}
         </div>

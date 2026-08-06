@@ -9,6 +9,7 @@ com\shopstack\repository\CategoryRepository.class
 com\shopstack\service\CustomerService.class
 com\shopstack\repository\WishlistItemRepository.class
 com\shopstack\controller\CustomerController.class
+com\shopstack\entity\InventoryHistory.class
 com\shopstack\security\JwtAuthFilter.class
 com\shopstack\exception\ResourceNotFoundException.class
 com\shopstack\service\WishlistService.class
@@ -29,6 +30,7 @@ com\shopstack\service\WishlistServiceImpl.class
 com\shopstack\repository\CustomerRepository.class
 com\shopstack\repository\ProductReviewRepository.class
 com\shopstack\exception\CustomerAlreadyExistsException.class
+com\shopstack\config\DataInitializer.class
 com\shopstack\dto\OrderDTO.class
 com\shopstack\entity\ApprovalStatus.class
 com\shopstack\dto\ProductDTO.class
@@ -50,6 +52,7 @@ com\shopstack\dto\RegisterRequest.class
 com\shopstack\dto\VendorRegisterRequest.class
 com\shopstack\entity\OrderItem.class
 com\shopstack\entity\Order.class
+com\shopstack\repository\InventoryHistoryRepository.class
 com\shopstack\dto\CategoryDTO.class
 com\shopstack\dto\CustomerDTO.class
 com\shopstack\service\CartService.class
@@ -70,6 +73,7 @@ com\shopstack\dto\UpdateProfileRequest.class
 com\shopstack\dto\AddToCartRequest.class
 com\shopstack\dto\VendorAnalyticsDTO.class
 com\shopstack\controller\WishlistController.class
+com\shopstack\dto\InventoryHistoryDTO.class
 com\shopstack\controller\ProductController.class
 com\shopstack\dto\ProductReviewRequest.class
 com\shopstack\service\OrderService.class

@@ -1,5 +1,6 @@
 package com.shopstack.controller;
 
+import com.shopstack.dto.InventoryHistoryDTO;
 import com.shopstack.dto.ProductDTO;
 import com.shopstack.dto.ProductReviewDTO;
 import com.shopstack.dto.ProductReviewRequest;
@@ -7,6 +8,7 @@ import com.shopstack.entity.ApprovalStatus;
 import com.shopstack.service.ProductReviewService;
 import com.shopstack.service.ProductService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -35,6 +37,50 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice) {
         return ResponseEntity.ok(productService.filterProducts(categoryId, search, minPrice, maxPrice));
+    }
+
+    @GetMapping("/featured")
+    public ResponseEntity<List<ProductDTO>> getFeaturedProducts() {
+        return ResponseEntity.ok(productService.getFeaturedProducts());
+    }
+
+    @GetMapping("/new-arrivals")
+    public ResponseEntity<List<ProductDTO>> getNewArrivals() {
+        return ResponseEntity.ok(productService.getNewArrivals());
+    }
+
+    @GetMapping("/best-sellers")
+    public ResponseEntity<List<ProductDTO>> getBestSellers() {
+        return ResponseEntity.ok(productService.getBestSellers());
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ProductDTO>> searchProducts(@RequestParam(name = "query", required = false) String query,
+                                                           @RequestParam(name = "search", required = false) String search) {
+        String searchTerm = (query != null && !query.isBlank()) ? query : search;
+        return ResponseEntity.ok(productService.searchProducts(searchTerm));
+    }
+
+    @GetMapping("/filter")
+    public ResponseEntity<?> filterProductsExtended(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Double rating,
+            @RequestParam(defaultValue = "newest") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<ProductDTO> result = productService.filterProductsExtended(
+                categoryId, brand, search, minPrice, maxPrice, rating, sort, page, size
+        );
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/category/{id}")
+    public ResponseEntity<List<ProductDTO>> getProductsByCategory(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.getProductsByCategory(id));
     }
 
     @GetMapping("/{id}")
@@ -70,5 +116,13 @@ public class ProductController {
     @PutMapping("/{id}/reject")
     public ResponseEntity<ProductDTO> rejectProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.updateApprovalStatus(id, ApprovalStatus.REJECTED));
+    }
+
+    @GetMapping("/{id}/inventory-history")
+    public ResponseEntity<List<InventoryHistoryDTO>> getInventoryHistory(
+            Authentication authentication,
+            @PathVariable Long id) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(productService.getInventoryHistory(id, email));
     }
 }

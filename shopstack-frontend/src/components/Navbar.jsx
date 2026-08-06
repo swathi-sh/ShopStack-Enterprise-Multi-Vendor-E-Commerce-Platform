@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
-import { LayoutDashboard, User, LogOut, Menu, X, ShoppingBag, ShoppingCart, Heart, Package, Store } from 'lucide-react';
+import { LayoutDashboard, User, LogOut, Menu, X, ShoppingBag, ShoppingCart, Heart, Package, Store, Home } from 'lucide-react';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,11 +19,11 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50 shadow-md">
+    <nav className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50 shadow-md font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/products')}>
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
             <div className="bg-gradient-to-tr from-indigo-500 to-purple-600 p-2 rounded-xl text-white shadow-lg">
               <ShoppingBag className="w-6 h-6" />
             </div>
@@ -36,18 +36,21 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-3">
             <NavLink
-              to="/products"
+              to="/"
+              end
               className={({ isActive }) =>
                 `flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`
               }
             >
-              <ShoppingBag className="w-4 h-4" />
+              <Home className="w-4 h-4" />
               <span>Catalog</span>
             </NavLink>
+
+           
 
             <NavLink
               to="/dashboard"

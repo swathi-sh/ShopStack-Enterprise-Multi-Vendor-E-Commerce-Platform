@@ -1,24 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
-import { Package, Plus, Edit2, Trash2, Tag, CheckCircle2, AlertCircle, RefreshCw, X, ShieldCheck } from 'lucide-react';
+import { Package, Plus, Edit2, Trash2, Tag, CheckCircle2, AlertCircle, RefreshCw, X, ShieldCheck, History } from 'lucide-react';
 
 const VendorProductsPage = () => {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([
-    
-  { id: 1, name: 'Electronics' },
-  { id: 2, name: 'Fashion' },
-  { id: 3, name: 'Footwear' },
-  { id: 4, name: 'Home & Kitchen' },
-  { id: 5, name: 'Beauty & Personal Care' },
-  { id: 6, name: 'Grocery' },
-  { id: 7, name: 'Books & Stationery' },
-  { id: 8, name: 'Sports & Fitness' },
-  { id: 9, name: 'Jewelry & Accessories' },
-  { id: 10, name: 'Toys & Games' }
-]);
-  
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [categoryFetchError, setCategoryFetchError] = useState('');
 
   // Add Product Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,6 +19,11 @@ const VendorProductsPage = () => {
     categoryId: '',
     imageUrl: '',
   });
+
+  // History modal state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
 
   // Inline edit state
   const [editingPriceId, setEditingPriceId] = useState(null);
@@ -51,8 +44,6 @@ const VendorProductsPage = () => {
     try {
       const res = await axiosClient.get('/vendor/products', vendorHeaders);
       setProducts(res.data);
-      const catRes = await axiosClient.get('/categories');
-      setCategories(catRes.data);
     } catch (err) {
       console.error('Failed to fetch vendor products', err);
     } finally {
@@ -60,12 +51,35 @@ const VendorProductsPage = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const catRes = await axiosClient.get('/categories');
+      if (catRes.data && catRes.data.length > 0) {
+        setCategories(catRes.data);
+        setCategoryFetchError('');
+      } else {
+        setCategoryFetchError('No categories found. Please contact admin.');
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories', err);
+      setCategoryFetchError('Failed to load categories. Is the backend running?');
+    }
+  };
+
   useEffect(() => {
     fetchVendorProducts();
+    fetchCategories();
   }, []);
 
   const handleAddProductSubmit = async (e) => {
     e.preventDefault();
+
+    // Guard: categoryId must be selected
+    if (!formData.categoryId) {
+      showMessage('Please select a category before saving.');
+      return;
+    }
+
     try {
       const images = formData.imageUrl ? [formData.imageUrl] : [];
       await axiosClient.post(
@@ -95,7 +109,10 @@ const VendorProductsPage = () => {
       showMessage('Product successfully created & added to inventory!');
       fetchVendorProducts();
     } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to create product.');
+      const msg = err.response?.data?.message
+        || (err.response?.data?.errors ? Object.values(err.response.data.errors).join(', ') : null)
+        || 'Failed to create product. Please check all fields.';
+      showMessage(msg);
     }
   };
 
@@ -329,7 +346,24 @@ const VendorProductsPage = () => {
                       </td>
 
                       {/* Actions */}
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right space-x-1">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await axiosClient.get(`/products/${item.id}/inventory-history`, vendorHeaders);
+                              setHistoryLogs(res.data);
+                              setSelectedProductForHistory(item);
+                              setShowHistoryModal(true);
+                            } catch (e) {
+                              showMessage('No history records found or error fetching history.');
+                            }
+                          }}
+                          className="p-2 text-slate-400 hover:text-purple-400 rounded-lg hover:bg-slate-800 transition-all"
+                          title="View Stock History"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => handleDeleteProduct(item.id)}
                           className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-all"
@@ -381,13 +415,16 @@ const VendorProductsPage = () => {
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
                     >
-                      <option value="">Select Category</option>
+                      <option value="">{categoryFetchError ? '⚠ Categories unavailable' : 'Select Category'}</option>
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>
                       ))}
                     </select>
+                    {categoryFetchError && (
+                      <p className="text-[11px] text-rose-400 mt-1">⚠ {categoryFetchError}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -432,12 +469,13 @@ const VendorProductsPage = () => {
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-slate-300">Product Image URL</label>
                   <input
-                    type="url"
+                    type="text"
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                     placeholder="https://images.unsplash.com/photo-..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                   />
+                  <p className="text-[11px] text-slate-500 mt-0.5">Paste a full image URL (e.g. https://...)</p>
                 </div>
 
                 <div className="space-y-1">
@@ -468,6 +506,59 @@ const VendorProductsPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Inventory History Log Modal */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-purple-900/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center">
+                    <History className="w-5 h-5 mr-2 text-purple-400" /> Stock Audit History
+                  </h2>
+                  <p className="text-xs text-slate-400">{selectedProductForHistory?.name}</p>
+                </div>
+                <button onClick={() => setShowHistoryModal(false)} className="p-1 text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {historyLogs.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">No stock history recorded yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {historyLogs.map((log) => (
+                    <div key={log.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          log.quantityChange > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {log.quantityChange > 0 ? `+${log.quantityChange}` : log.quantityChange} units
+                        </span>
+                        <div className="text-xs text-slate-300 font-medium mt-1">{log.changeReason}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-slate-400 font-bold">New Stock: {log.resultingStock}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Recent'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

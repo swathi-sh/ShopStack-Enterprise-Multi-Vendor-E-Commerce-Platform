@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { store } from './store';
 
 // Customer Components & Pages
+import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -23,8 +24,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedVendorRoute from './components/ProtectedVendorRoute';
 import Navbar from './components/Navbar';
 import VendorNavbar from './components/VendorNavbar';
+import Footer from './components/Footer';
 
-// Layout wrapper for customer pages requiring top Navbar
+// Layout wrapper for customer pages requiring top Navbar and Footer
 const CustomerLayout = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
@@ -32,6 +34,7 @@ const CustomerLayout = () => {
       <main className="flex-1">
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 };
@@ -44,6 +47,7 @@ const VendorLayout = () => {
       <main className="flex-1">
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 };
@@ -61,8 +65,9 @@ function App() {
           <Route path="/vendor/login" element={<VendorAuthPage />} />
           <Route path="/vendor/register" element={<VendorAuthPage />} />
 
-          {/* Public Catalog Routes */}
+          {/* Public Customer & Catalog Routes */}
           <Route element={<CustomerLayout />}>
+            <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductCatalogPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
           </Route>
@@ -89,7 +94,7 @@ function App() {
           </Route>
 
           {/* Default Fallback */}
-          <Route path="*" element={<Navigate to="/products" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </Provider>

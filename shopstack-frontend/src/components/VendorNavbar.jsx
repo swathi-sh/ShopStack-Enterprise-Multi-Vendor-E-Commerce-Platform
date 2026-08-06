@@ -73,7 +73,7 @@ const VendorNavbar = () => {
           {/* Vendor Business Badge & Customer Store Switch */}
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => navigate('/products')}
+              onClick={() => navigate('/')}
               className="hidden sm:flex items-center space-x-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-all"
             >
               <ArrowLeft className="w-3.5 h-3.5" />

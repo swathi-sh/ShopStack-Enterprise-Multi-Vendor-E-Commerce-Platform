@@ -1,15 +1,22 @@
 package com.shopstack.service;
 
+import com.shopstack.dto.InventoryHistoryDTO;
 import com.shopstack.dto.ProductDTO;
 import com.shopstack.dto.ProductRequestDTO;
 import com.shopstack.entity.ApprovalStatus;
 import com.shopstack.entity.Category;
+import com.shopstack.entity.InventoryHistory;
 import com.shopstack.entity.Product;
 import com.shopstack.entity.Vendor;
 import com.shopstack.exception.ResourceNotFoundException;
 import com.shopstack.repository.CategoryRepository;
+import com.shopstack.repository.InventoryHistoryRepository;
 import com.shopstack.repository.ProductRepository;
 import com.shopstack.repository.VendorRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +31,16 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final VendorRepository vendorRepository;
+    private final InventoryHistoryRepository inventoryHistoryRepository;
 
     public ProductServiceImpl(ProductRepository productRepository,
-                              CategoryRepository categoryRepository,
-                              VendorRepository vendorRepository) {
+                               CategoryRepository categoryRepository,
+                               VendorRepository vendorRepository,
+                               InventoryHistoryRepository inventoryHistoryRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.vendorRepository = vendorRepository;
+        this.inventoryHistoryRepository = inventoryHistoryRepository;
     }
 
     @Override
@@ -47,13 +57,23 @@ public class ProductServiceImpl implements ProductService {
         product.setBrand(request.getBrand());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
+        product.setStockQuantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0);
         product.setCategory(category);
         product.setVendor(vendor);
         product.setImages(request.getImages() != null ? request.getImages() : new ArrayList<>());
         product.setApprovalStatus(ApprovalStatus.APPROVED);
 
         Product savedProduct = productRepository.save(product);
+
+        // Record initial inventory history
+        InventoryHistory history = new InventoryHistory(
+                savedProduct,
+                savedProduct.getStockQuantity(),
+                savedProduct.getStockQuantity(),
+                "INITIAL_STOCK"
+        );
+        inventoryHistoryRepository.save(history);
+
         return new ProductDTO(savedProduct);
     }
 
@@ -77,7 +97,19 @@ public class ProductServiceImpl implements ProductService {
         product.setBrand(request.getBrand());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
+        if (request.getStockQuantity() != null && !request.getStockQuantity().equals(product.getStockQuantity())) {
+            int oldStock = product.getStockQuantity();
+            int diff = request.getStockQuantity() - oldStock;
+            product.setStockQuantity(request.getStockQuantity());
+
+            InventoryHistory history = new InventoryHistory(
+                    product,
+                    diff,
+                    request.getStockQuantity(),
+                    "VENDOR_MANUAL_UPDATE"
+            );
+            inventoryHistoryRepository.save(history);
+        }
         if (request.getImages() != null) {
             product.setImages(request.getImages());
         }
@@ -110,8 +142,21 @@ public class ProductServiceImpl implements ProductService {
             throw new RuntimeException("Unauthorized to modify product inventory stock");
         }
 
+        int oldStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+        int diff = newStock - oldStock;
         product.setStockQuantity(newStock);
-        return new ProductDTO(productRepository.save(product));
+
+        Product saved = productRepository.save(product);
+
+        InventoryHistory history = new InventoryHistory(
+                saved,
+                diff,
+                newStock,
+                "VENDOR_STOCK_ADJUSTMENT"
+        );
+        inventoryHistoryRepository.save(history);
+
+        return new ProductDTO(saved);
     }
 
     @Override
@@ -169,5 +214,85 @@ public class ProductServiceImpl implements ProductService {
 
         product.setApprovalStatus(status);
         return new ProductDTO(productRepository.save(product));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getFeaturedProducts() {
+        Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "rating", "reviewCount"));
+        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
+                .getContent().stream()
+                .map(ProductDTO::new)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getNewArrivals() {
+        Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
+                .getContent().stream()
+                .map(ProductDTO::new)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getBestSellers() {
+        Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "reviewCount", "rating"));
+        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
+                .getContent().stream()
+                .map(ProductDTO::new)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> searchProducts(String query) {
+        return filterProducts(null, query, null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getProductsByCategory(Long categoryId) {
+        return productRepository.findByApprovalStatusAndCategoryId(ApprovalStatus.APPROVED, categoryId)
+                .stream().map(ProductDTO::new).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductDTO> filterProductsExtended(Long categoryId, String brand, String search, BigDecimal minPrice, BigDecimal maxPrice, Double minRating, String sort, int page, int size) {
+        Sort sorting = Sort.by(Sort.Direction.DESC, "createdAt");
+        if ("price_asc".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.ASC, "price");
+        } else if ("price_desc".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.DESC, "price");
+        } else if ("rating_desc".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.DESC, "rating");
+        } else if ("newest".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+
+        Pageable pageable = PageRequest.of(page, size, sorting);
+        Page<Product> products = productRepository.filterProductsExtended(
+                ApprovalStatus.APPROVED, categoryId, brand, search, minPrice, maxPrice, minRating, pageable
+        );
+
+        return products.map(ProductDTO::new);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InventoryHistoryDTO> getInventoryHistory(Long productId, String vendorEmail) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+        if (!product.getVendor().getEmail().equalsIgnoreCase(vendorEmail)) {
+            throw new RuntimeException("Unauthorized: Product does not belong to vendor");
+        }
+
+        return inventoryHistoryRepository.findByProductIdOrderByCreatedAtDesc(productId).stream()
+                .map(InventoryHistoryDTO::new)
+                .collect(Collectors.toList());
     }
 }
