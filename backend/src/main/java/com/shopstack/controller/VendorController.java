@@ -87,6 +87,16 @@ public class VendorController {
         return ResponseEntity.ok(productService.updateStock(id, email, stock));
     }
 
+    @PatchMapping("/products/{id}/discount")
+    public ResponseEntity<ProductDTO> updateProductDiscount(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        String email = authentication.getName();
+        Double discount = Double.parseDouble(body.get("discountPercentage").toString());
+        return ResponseEntity.ok(productService.applyDiscount(id, email, discount));
+    }
+
     @DeleteMapping("/products/{id}")
     public ResponseEntity<Void> deleteVendorProduct(Authentication authentication, @PathVariable Long id) {
         String email = authentication.getName();

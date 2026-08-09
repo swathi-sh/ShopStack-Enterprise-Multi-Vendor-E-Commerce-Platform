@@ -58,7 +58,7 @@ public class OrderServiceImpl implements OrderService {
         order.setShippingAddress(request.getShippingAddress() != null && !request.getShippingAddress().isBlank()
                 ? request.getShippingAddress()
                 : (customer.getAddress() != null ? customer.getAddress() : "Default Address"));
-        order.setStatus(OrderStatus.PROCESSING);
+        order.setStatus(OrderStatus.CONFIRMED);
 
         List<OrderItem> orderItems = new ArrayList<>();
 
@@ -82,10 +82,12 @@ public class OrderServiceImpl implements OrderService {
             );
             inventoryHistoryRepository.save(history);
 
-            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            // Use finalPrice if available (with discount applied), otherwise fall back to price
+            BigDecimal effectivePrice = product.getFinalPrice() != null ? product.getFinalPrice() : product.getPrice();
+            BigDecimal itemTotal = effectivePrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             total = total.add(itemTotal);
 
-            OrderItem orderItem = new OrderItem(order, product, product.getVendor(), cartItem.getQuantity(), product.getPrice());
+            OrderItem orderItem = new OrderItem(order, product, product.getVendor(), cartItem.getQuantity(), effectivePrice);
             orderItems.add(orderItem);
         }
 

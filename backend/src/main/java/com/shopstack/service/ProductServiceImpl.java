@@ -57,11 +57,13 @@ public class ProductServiceImpl implements ProductService {
         product.setBrand(request.getBrand());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
+        product.setDiscountPercentage(request.getDiscountPercentage() != null ? request.getDiscountPercentage() : 0.0);
         product.setStockQuantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0);
         product.setCategory(category);
         product.setVendor(vendor);
         product.setImages(request.getImages() != null ? request.getImages() : new ArrayList<>());
         product.setApprovalStatus(ApprovalStatus.APPROVED);
+        // finalPrice is computed in @PrePersist
 
         Product savedProduct = productRepository.save(product);
 
@@ -97,6 +99,10 @@ public class ProductServiceImpl implements ProductService {
         product.setBrand(request.getBrand());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
+        if (request.getDiscountPercentage() != null) {
+            product.setDiscountPercentage(request.getDiscountPercentage());
+        }
+        // finalPrice is recomputed in @PreUpdate
         if (request.getStockQuantity() != null && !request.getStockQuantity().equals(product.getStockQuantity())) {
             int oldStock = product.getStockQuantity();
             int diff = request.getStockQuantity() - oldStock;
@@ -129,6 +135,22 @@ public class ProductServiceImpl implements ProductService {
         }
 
         product.setPrice(newPrice);
+        // finalPrice is recomputed in @PreUpdate
+        return new ProductDTO(productRepository.save(product));
+    }
+
+    @Override
+    @Transactional
+    public ProductDTO applyDiscount(Long productId, String vendorEmail, Double discountPercentage) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+        if (!product.getVendor().getEmail().equalsIgnoreCase(vendorEmail)) {
+            throw new RuntimeException("Unauthorized to modify product discount");
+        }
+
+        product.setDiscountPercentage(discountPercentage != null ? discountPercentage : 0.0);
+        // finalPrice is recomputed in @PreUpdate
         return new ProductDTO(productRepository.save(product));
     }
 
@@ -262,6 +284,9 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductDTO> filterProductsExtended(Long categoryId, String brand, String search, BigDecimal minPrice, BigDecimal maxPrice, Double minRating, String sort, int page, int size) {
+        String cleanBrand = (brand != null && !brand.isBlank()) ? brand.trim() : null;
+        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+
         Sort sorting = Sort.by(Sort.Direction.DESC, "createdAt");
         if ("price_asc".equalsIgnoreCase(sort)) {
             sorting = Sort.by(Sort.Direction.ASC, "price");
@@ -275,7 +300,7 @@ public class ProductServiceImpl implements ProductService {
 
         Pageable pageable = PageRequest.of(page, size, sorting);
         Page<Product> products = productRepository.filterProductsExtended(
-                ApprovalStatus.APPROVED, categoryId, brand, search, minPrice, maxPrice, minRating, pageable
+                ApprovalStatus.APPROVED, categoryId, cleanBrand, cleanSearch, minPrice, maxPrice, minRating, pageable
         );
 
         return products.map(ProductDTO::new);

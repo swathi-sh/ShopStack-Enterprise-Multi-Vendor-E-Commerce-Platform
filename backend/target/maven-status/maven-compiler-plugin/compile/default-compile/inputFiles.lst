@@ -65,6 +65,7 @@ D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\security\JwtAuthFi
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\CustomerService.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\AddToCartRequest.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\WishlistController.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\PaymentController.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\ProductRequestDTO.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\CustomerController.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\VendorAuthController.java

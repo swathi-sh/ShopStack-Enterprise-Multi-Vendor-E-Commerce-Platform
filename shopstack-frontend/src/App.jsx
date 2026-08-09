@@ -13,6 +13,7 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
 import OrdersPage from './pages/OrdersPage';
+import CheckoutPage from './pages/CheckoutPage';
 
 // Vendor Components & Pages
 import VendorAuthPage from './pages/VendorAuthPage';
@@ -79,6 +80,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/edit" element={<ProfilePage />} />
               <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/wishlist" element={<WishlistPage />} />
               <Route path="/orders" element={<OrdersPage />} />
             </Route>

@@ -13,6 +13,8 @@ public class ProductDTO {
     private String brand;
     private String description;
     private BigDecimal price;
+    private Double discountPercentage;
+    private BigDecimal finalPrice;
     private Integer stockQuantity;
     private CategoryDTO category;
     private VendorDTO vendor;
@@ -32,6 +34,8 @@ public class ProductDTO {
         this.brand = product.getBrand();
         this.description = product.getDescription();
         this.price = product.getPrice();
+        this.discountPercentage = product.getDiscountPercentage();
+        this.finalPrice = product.getFinalPrice();
         this.stockQuantity = product.getStockQuantity();
         this.category = product.getCategory() != null ? new CategoryDTO(product.getCategory()) : null;
         this.vendor = product.getVendor() != null ? new VendorDTO(product.getVendor()) : null;
@@ -81,6 +85,22 @@ public class ProductDTO {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public Double getDiscountPercentage() {
+        return discountPercentage;
+    }
+
+    public void setDiscountPercentage(Double discountPercentage) {
+        this.discountPercentage = discountPercentage;
+    }
+
+    public BigDecimal getFinalPrice() {
+        return finalPrice;
+    }
+
+    public void setFinalPrice(BigDecimal finalPrice) {
+        this.finalPrice = finalPrice;
     }
 
     public Integer getStockQuantity() {

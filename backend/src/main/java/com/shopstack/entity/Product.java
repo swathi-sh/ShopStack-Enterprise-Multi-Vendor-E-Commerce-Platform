@@ -2,6 +2,7 @@ package com.shopstack.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,12 @@ public class Product {
 
     @Column(nullable = false)
     private BigDecimal price;
+
+    @Column(name = "discount_percentage")
+    private Double discountPercentage = 0.0;
+
+    @Column(name = "final_price")
+    private BigDecimal finalPrice;
 
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity = 0;
@@ -59,15 +66,37 @@ public class Product {
     public Product() {
     }
 
+    /**
+     * Recalculate finalPrice based on current price and discountPercentage.
+     * finalPrice = price * (1 - discountPercentage / 100)
+     */
+    public void recalculateFinalPrice() {
+        if (this.price == null) {
+            this.finalPrice = BigDecimal.ZERO;
+            return;
+        }
+        double discount = (this.discountPercentage != null) ? this.discountPercentage : 0.0;
+        if (discount <= 0.0) {
+            this.finalPrice = this.price;
+        } else {
+            BigDecimal discountFactor = BigDecimal.ONE.subtract(
+                BigDecimal.valueOf(discount).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
+            );
+            this.finalPrice = this.price.multiply(discountFactor).setScale(2, RoundingMode.HALF_UP);
+        }
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        recalculateFinalPrice();
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        recalculateFinalPrice();
     }
 
     public Long getId() {
@@ -108,6 +137,22 @@ public class Product {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public Double getDiscountPercentage() {
+        return discountPercentage;
+    }
+
+    public void setDiscountPercentage(Double discountPercentage) {
+        this.discountPercentage = discountPercentage != null ? discountPercentage : 0.0;
+    }
+
+    public BigDecimal getFinalPrice() {
+        return finalPrice != null ? finalPrice : price;
+    }
+
+    public void setFinalPrice(BigDecimal finalPrice) {
+        this.finalPrice = finalPrice;
     }
 
     public Integer getStockQuantity() {

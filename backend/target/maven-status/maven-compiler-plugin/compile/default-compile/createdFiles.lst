@@ -74,6 +74,7 @@ com\shopstack\dto\AddToCartRequest.class
 com\shopstack\dto\VendorAnalyticsDTO.class
 com\shopstack\controller\WishlistController.class
 com\shopstack\dto\InventoryHistoryDTO.class
+com\shopstack\controller\PaymentController.class
 com\shopstack\controller\ProductController.class
 com\shopstack\dto\ProductReviewRequest.class
 com\shopstack\service\OrderService.class

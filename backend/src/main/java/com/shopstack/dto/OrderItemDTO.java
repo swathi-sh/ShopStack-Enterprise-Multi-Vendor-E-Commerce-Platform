@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 public class OrderItemDTO {
 
     private Long id;
+    private Long orderId;
+    private String orderStatus;
     private ProductDTO product;
     private VendorDTO vendor;
     private Integer quantity;
@@ -16,6 +18,8 @@ public class OrderItemDTO {
 
     public OrderItemDTO(OrderItem item) {
         this.id = item.getId();
+        this.orderId = item.getOrder() != null ? item.getOrder().getId() : null;
+        this.orderStatus = item.getOrder() != null ? item.getOrder().getStatus().name() : null;
         this.product = item.getProduct() != null ? new ProductDTO(item.getProduct()) : null;
         this.vendor = item.getVendor() != null ? new VendorDTO(item.getVendor()) : null;
         this.quantity = item.getQuantity();
@@ -28,6 +32,22 @@ public class OrderItemDTO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+
+    public String getOrderStatus() {
+        return orderStatus;
+    }
+
+    public void setOrderStatus(String orderStatus) {
+        this.orderStatus = orderStatus;
     }
 
     public ProductDTO getProduct() {

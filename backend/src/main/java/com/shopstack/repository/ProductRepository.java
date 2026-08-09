@@ -26,7 +26,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     @Query("SELECT p FROM Product p WHERE p.approvalStatus = :status " +
            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
-           "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:search IS NULL OR LOWER(p.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.brand) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.category.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%')) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR p.price <= :maxPrice)")
     List<Product> filterProducts(
@@ -39,8 +39,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     @Query("SELECT p FROM Product p WHERE p.approvalStatus = :status " +
            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
-           "AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand)) " +
-           "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:brand IS NULL OR LOWER(p.brand) = LOWER(CAST(:brand AS string))) " +
+           "AND (:search IS NULL OR LOWER(p.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.brand) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.category.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%')) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR p.price <= :maxPrice) " +
            "AND (:minRating IS NULL OR p.rating >= :minRating)")

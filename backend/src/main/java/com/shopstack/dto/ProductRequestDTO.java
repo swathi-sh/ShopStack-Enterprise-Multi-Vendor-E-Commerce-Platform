@@ -19,6 +19,8 @@ public class ProductRequestDTO {
     @DecimalMin(value = "0.01", message = "Price must be greater than 0")
     private BigDecimal price;
 
+    private Double discountPercentage = 0.0;
+
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
     private Integer stockQuantity;
@@ -61,6 +63,14 @@ public class ProductRequestDTO {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public Double getDiscountPercentage() {
+        return discountPercentage;
+    }
+
+    public void setDiscountPercentage(Double discountPercentage) {
+        this.discountPercentage = discountPercentage;
     }
 
     public Integer getStockQuantity() {

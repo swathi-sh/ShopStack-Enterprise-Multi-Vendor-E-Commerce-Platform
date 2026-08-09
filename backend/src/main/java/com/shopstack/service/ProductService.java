@@ -14,6 +14,7 @@ public interface ProductService {
     ProductDTO updateProduct(Long productId, String vendorEmail, ProductRequestDTO request);
     ProductDTO updatePrice(Long productId, String vendorEmail, BigDecimal newPrice);
     ProductDTO updateStock(Long productId, String vendorEmail, Integer newStock);
+    ProductDTO applyDiscount(Long productId, String vendorEmail, Double discountPercentage);
     void deleteProduct(Long productId, String vendorEmail);
     ProductDTO getProductById(Long id);
     List<ProductDTO> filterProducts(Long categoryId, String search, BigDecimal minPrice, BigDecimal maxPrice);

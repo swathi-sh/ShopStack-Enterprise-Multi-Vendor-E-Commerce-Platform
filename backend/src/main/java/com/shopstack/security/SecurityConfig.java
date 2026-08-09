@@ -75,7 +75,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**", "/api/vendor/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
                 .requestMatchers("/api/categories/**").permitAll()
-                .requestMatchers("/api/customers/**", "/api/cart/**", "/api/wishlist/**", "/api/orders/**", "/api/vendor/**").authenticated()
+                .requestMatchers("/api/payment/create-order").permitAll()
+                .requestMatchers("/api/customers/**", "/api/cart/**", "/api/wishlist/**", "/api/orders/**", "/api/vendor/**", "/api/payment/**").authenticated()
                 .anyRequest().permitAll()
             );
 

@@ -15,8 +15,42 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Zap,
+  Cpu,
+  Shirt,
+  Home,
+  Sofa,
+  Activity,
+  BookOpen,
+  Sparkles,
+  Watch
 } from 'lucide-react';
+
+// Flipkart-style quick-filter category pills (matched against DB category names)
+const QUICK_CATEGORIES = [
+  { label: 'All', icon: ShoppingBag, color: 'indigo' },
+  { label: 'Electronics', icon: Cpu, color: 'blue' },
+  { label: 'Fashion', icon: Shirt, color: 'pink' },
+  { label: 'Home & Kitchen', icon: Home, color: 'amber' },
+  { label: 'Furniture', icon: Sofa, color: 'orange' },
+  { label: 'Sports', icon: Activity, color: 'green' },
+  { label: 'Books', icon: BookOpen, color: 'purple' },
+  { label: 'Beauty', icon: Sparkles, color: 'rose' },
+  { label: 'Accessories', icon: Watch, color: 'teal' },
+];
+
+const colorMap = {
+  indigo: { active: 'bg-indigo-600 text-white border-indigo-500', inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-indigo-500/50 hover:text-indigo-300' },
+  blue:   { active: 'bg-blue-600 text-white border-blue-500',     inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-blue-500/50 hover:text-blue-300' },
+  pink:   { active: 'bg-pink-600 text-white border-pink-500',     inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-pink-500/50 hover:text-pink-300' },
+  amber:  { active: 'bg-amber-600 text-white border-amber-500',   inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-amber-500/50 hover:text-amber-300' },
+  orange: { active: 'bg-orange-600 text-white border-orange-500', inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-orange-500/50 hover:text-orange-300' },
+  green:  { active: 'bg-emerald-600 text-white border-emerald-500', inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-emerald-500/50 hover:text-emerald-300' },
+  purple: { active: 'bg-purple-600 text-white border-purple-500', inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-purple-500/50 hover:text-purple-300' },
+  rose:   { active: 'bg-rose-600 text-white border-rose-500',     inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-rose-500/50 hover:text-rose-300' },
+  teal:   { active: 'bg-teal-600 text-white border-teal-500',     inactive: 'bg-slate-900 text-slate-300 border-slate-700 hover:border-teal-500/50 hover:text-teal-300' },
+};
 
 const ProductCatalogPage = () => {
   const dispatch = useDispatch();
@@ -33,35 +67,74 @@ const ProductCatalogPage = () => {
   const [ratingFilter, setRatingFilter] = useState(filters.rating || '');
   const [sortBy, setSortBy] = useState(filters.sort || searchParams.get('sort') || 'newest');
   const [currentPage, setCurrentPage] = useState(0);
+  const [activeQuickCat, setActiveQuickCat] = useState('All');
 
   const [toastMessage, setToastMessage] = useState('');
 
-  // Initial category & product fetch
+  // Helper to find category object by ID or Name
+  const findCategory = (identifier, catList = categories) => {
+    if (!identifier || !catList || catList.length === 0) return null;
+    const target = String(identifier).trim().toLowerCase();
+
+    // Exact ID match
+    let found = catList.find((c) => String(c.id) === target);
+    if (found) return found;
+
+    // Exact Name match
+    found = catList.find((c) => c.name.toLowerCase() === target);
+    if (found) return found;
+
+    // Partial/Fuzzy Name match (e.g. "Home" matching "Home & Kitchen")
+    found = catList.find(
+      (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
+    );
+    return found || null;
+  };
+
+  // Initial category fetch
   useEffect(() => {
     dispatch(fetchCategories());
   }, [dispatch]);
 
-  // Handle URL query parameters if present
+  // Sync parameters with URL & DB categories
   useEffect(() => {
     const urlCategory = searchParams.get('category');
     const urlSort = searchParams.get('sort');
     const urlSearch = searchParams.get('search');
 
-    if (urlCategory) setSelectedCat(urlCategory);
     if (urlSort) setSortBy(urlSort);
-    if (urlSearch) setSearchTerm(urlSearch);
+    if (urlSearch !== null) setSearchTerm(urlSearch);
+
+    let effectiveCatId = '';
+    let effectiveCatName = 'All';
+
+    const targetCatIdentifier = urlCategory || selectedCat;
+    if (targetCatIdentifier) {
+      const catObj = findCategory(targetCatIdentifier, categories);
+      if (catObj) {
+        effectiveCatId = String(catObj.id);
+        effectiveCatName = catObj.name;
+      } else if (!isNaN(targetCatIdentifier)) {
+        effectiveCatId = String(targetCatIdentifier);
+      } else {
+        effectiveCatName = targetCatIdentifier;
+      }
+    }
+
+    setSelectedCat(effectiveCatId);
+    setActiveQuickCat(effectiveCatName);
 
     loadProducts(
-      urlCategory || selectedCat,
+      effectiveCatId,
       brandFilter,
-      urlSearch || searchTerm,
+      urlSearch !== null ? urlSearch : searchTerm,
       minPrice,
       maxPrice,
       ratingFilter,
       urlSort || sortBy,
       currentPage
     );
-  }, [searchParams, currentPage]);
+  }, [categories, searchParams, currentPage]);
 
   const loadProducts = (cat, brand, search, minP, maxP, rating, sort, page) => {
     const params = {
@@ -79,9 +152,62 @@ const ProductCatalogPage = () => {
     dispatch(fetchCatalogProducts(params));
   };
 
+  const updateQueryParams = (newParams) => {
+    const current = Object.fromEntries(searchParams.entries());
+    const updated = { ...current, ...newParams };
+    Object.keys(updated).forEach((k) => {
+      if (!updated[k]) delete updated[k];
+    });
+    setSearchParams(updated);
+  };
+
+  // Handle quick category pill click
+  const handleQuickCatClick = (catLabel) => {
+    setCurrentPage(0);
+
+    if (catLabel === 'All') {
+      setSelectedCat('');
+      setActiveQuickCat('All');
+      updateQueryParams({ category: '', page: 0 });
+      loadProducts('', brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+    } else {
+      const matched = findCategory(catLabel, categories);
+      if (matched) {
+        const catIdStr = String(matched.id);
+        setSelectedCat(catIdStr);
+        setActiveQuickCat(matched.name);
+        updateQueryParams({ category: catIdStr, page: 0 });
+        loadProducts(catIdStr, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+      } else {
+        // Fallback search by category label
+        setSelectedCat('');
+        setActiveQuickCat(catLabel);
+        updateQueryParams({ category: '', search: catLabel, page: 0 });
+        loadProducts('', brandFilter, catLabel, minPrice, maxPrice, ratingFilter, sortBy, 0);
+      }
+    }
+  };
+
+  const handleCategorySelectChange = (e) => {
+    const val = e.target.value;
+    setSelectedCat(val);
+    setCurrentPage(0);
+    if (!val) {
+      setActiveQuickCat('All');
+      updateQueryParams({ category: '', page: 0 });
+      loadProducts('', brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+    } else {
+      const matched = findCategory(val, categories);
+      setActiveQuickCat(matched ? matched.name : 'All');
+      updateQueryParams({ category: val, page: 0 });
+      loadProducts(val, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setCurrentPage(0);
+    updateQueryParams({ search: searchTerm, page: 0 });
     loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
   };
 
@@ -94,6 +220,7 @@ const ProductCatalogPage = () => {
     setRatingFilter('');
     setSortBy('newest');
     setCurrentPage(0);
+    setActiveQuickCat('All');
     setSearchParams({});
     dispatch(resetFilters());
     loadProducts('', '', '', '', '', '', 'newest', 0);
@@ -133,7 +260,7 @@ const ProductCatalogPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Toast Alert */}
         {toastMessage && (
           <div className="fixed bottom-6 right-6 z-50 bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-2xl font-medium text-sm flex items-center space-x-2 animate-bounce">
@@ -153,13 +280,34 @@ const ProductCatalogPage = () => {
               Explore Enterprise <span className="text-indigo-400">Products</span>
             </h1>
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-              Filter by category, brand, price, or rating. All items feature real-time inventory management and vendor verification.
+              Filter by category, brand, price, or rating. All items feature real-time inventory and verified vendors.
             </p>
           </div>
         </div>
 
-        {/* Advanced Filters & Search Header */}
-        <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+        {/* Flipkart-style Quick Category Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {QUICK_CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = activeQuickCat === cat.label;
+            const colors = colorMap[cat.color];
+            return (
+              <button
+                key={cat.label}
+                onClick={() => handleQuickCatClick(cat.label)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer flex-shrink-0 ${
+                  isActive ? colors.active : colors.inactive
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Advanced Filters & Search */}
+        <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
           <form onSubmit={handleSearchSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
               {/* Search Bar */}
@@ -176,15 +324,11 @@ const ProductCatalogPage = () => {
                 />
               </div>
 
-              {/* Category Filter */}
+              {/* Category Filter Dropdown */}
               <div className="lg:col-span-3">
                 <select
                   value={selectedCat}
-                  onChange={(e) => {
-                    setSelectedCat(e.target.value);
-                    setCurrentPage(0);
-                    loadProducts(e.target.value, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
-                  }}
+                  onChange={handleCategorySelectChange}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                   disabled={categoryLoading}
                 >
@@ -220,7 +364,7 @@ const ProductCatalogPage = () => {
                 </select>
               </div>
 
-              {/* Sort By Dropdown */}
+              {/* Sort By */}
               <div className="lg:col-span-3">
                 <select
                   value={sortBy}
@@ -232,8 +376,8 @@ const ProductCatalogPage = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="newest">Sort: Newest Arrivals</option>
-                  <option value="price_asc">Sort: Price (Low &rarr; High)</option>
-                  <option value="price_desc">Sort: Price (High &rarr; Low)</option>
+                  <option value="price_asc">Sort: Price (Low → High)</option>
+                  <option value="price_desc">Sort: Price (High → Low)</option>
                   <option value="rating_desc">Sort: Highest Rated</option>
                 </select>
               </div>
@@ -242,12 +386,12 @@ const ProductCatalogPage = () => {
             {/* Price & Rating Sub-filters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-12 gap-3 pt-2 border-t border-slate-800/80 items-center">
               <div className="lg:col-span-3 flex items-center space-x-2">
-                <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Price:</span>
+                <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Price ₹:</span>
                 <input
                   type="number"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  placeholder="Min $"
+                  placeholder="Min"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
                 <span className="text-slate-500">-</span>
@@ -255,7 +399,7 @@ const ProductCatalogPage = () => {
                   type="number"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  placeholder="Max $"
+                  placeholder="Max"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -286,7 +430,7 @@ const ProductCatalogPage = () => {
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer flex items-center space-x-1"
                 >
                   <X className="w-3.5 h-3.5" />
-                  <span>Reset Filters</span>
+                  <span>Reset</span>
                 </button>
 
                 <button
@@ -301,12 +445,15 @@ const ProductCatalogPage = () => {
           </form>
         </div>
 
-        {/* Product Grid Header */}
+        {/* Product Grid */}
         <div>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white flex items-center">
               <ShoppingBag className="w-5 h-5 mr-2 text-indigo-400" />
-              Products Found ({pagination.totalElements || products.length})
+              {activeQuickCat !== 'All' ? `${activeQuickCat} Products` : 'All Products'}
+              <span className="ml-2 text-sm font-normal text-slate-400">
+                ({pagination.totalElements || products.length} found)
+              </span>
             </h2>
 
             <button
@@ -318,9 +465,9 @@ const ProductCatalogPage = () => {
             </button>
           </div>
 
-          {/* Skeleton Loaders during loading state */}
+          {/* Skeleton Loaders */}
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {Array.from({ length: 8 }).map((_, idx) => (
                 <div key={idx} className="bg-slate-900/60 border border-slate-800 rounded-2xl h-80 animate-pulse p-5 space-y-4">
                   <div className="h-44 bg-slate-800/80 rounded-xl"></div>
@@ -334,7 +481,7 @@ const ProductCatalogPage = () => {
               <ShoppingBag className="w-14 h-14 text-slate-600 mx-auto" />
               <h3 className="text-xl font-bold text-white">No products found</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                No items match your selected filters. Try clearing search terms or selecting different categories.
+                No items match your selected filters. Try clearing search terms or selecting a different category.
               </p>
               <button
                 onClick={handleResetFilters}
@@ -344,7 +491,7 @@ const ProductCatalogPage = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {products.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -357,7 +504,7 @@ const ProductCatalogPage = () => {
             </div>
           )}
 
-          {/* Pagination Bar */}
+          {/* Pagination */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-center space-x-3 pt-10">
               <button

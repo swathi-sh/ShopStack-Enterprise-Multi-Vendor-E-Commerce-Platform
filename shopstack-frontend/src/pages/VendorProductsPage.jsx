@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
-import { Package, Plus, Edit2, Trash2, Tag, CheckCircle2, AlertCircle, RefreshCw, X, ShieldCheck, History } from 'lucide-react';
+import {
+  Package, Plus, Edit2, Trash2, Tag, CheckCircle2, AlertCircle,
+  RefreshCw, X, ShieldCheck, History, Percent, Zap
+} from 'lucide-react';
 
 const VendorProductsPage = () => {
   const [products, setProducts] = useState([]);
@@ -15,6 +18,7 @@ const VendorProductsPage = () => {
     brand: '',
     description: '',
     price: '',
+    discountPercentage: '',
     stockQuantity: '',
     categoryId: '',
     imageUrl: '',
@@ -30,8 +34,11 @@ const VendorProductsPage = () => {
   const [newPrice, setNewPrice] = useState('');
   const [editingStockId, setEditingStockId] = useState(null);
   const [newStock, setNewStock] = useState('');
+  const [editingDiscountId, setEditingDiscountId] = useState(null);
+  const [newDiscount, setNewDiscount] = useState('');
 
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
 
   const vendorHeaders = {
     headers: {
@@ -73,13 +80,10 @@ const VendorProductsPage = () => {
 
   const handleAddProductSubmit = async (e) => {
     e.preventDefault();
-
-    // Guard: categoryId must be selected
     if (!formData.categoryId) {
-      showMessage('Please select a category before saving.');
+      showMessage('Please select a category before saving.', 'error');
       return;
     }
-
     try {
       const images = formData.imageUrl ? [formData.imageUrl] : [];
       await axiosClient.post(
@@ -89,30 +93,22 @@ const VendorProductsPage = () => {
           brand: formData.brand,
           description: formData.description,
           price: Number(formData.price),
+          discountPercentage: formData.discountPercentage ? Number(formData.discountPercentage) : 0,
           stockQuantity: Number(formData.stockQuantity),
           categoryId: Number(formData.categoryId),
           images,
         },
         vendorHeaders
       );
-
       setShowAddModal(false);
-      setFormData({
-        name: '',
-        brand: '',
-        description: '',
-        price: '',
-        stockQuantity: '',
-        categoryId: '',
-        imageUrl: '',
-      });
+      setFormData({ name: '', brand: '', description: '', price: '', discountPercentage: '', stockQuantity: '', categoryId: '', imageUrl: '' });
       showMessage('Product successfully created & added to inventory!');
       fetchVendorProducts();
     } catch (err) {
       const msg = err.response?.data?.message
         || (err.response?.data?.errors ? Object.values(err.response.data.errors).join(', ') : null)
         || 'Failed to create product. Please check all fields.';
-      showMessage(msg);
+      showMessage(msg, 'error');
     }
   };
 
@@ -123,7 +119,7 @@ const VendorProductsPage = () => {
       showMessage('Product price updated!');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to update price.');
+      showMessage('Failed to update price.', 'error');
     }
   };
 
@@ -134,7 +130,19 @@ const VendorProductsPage = () => {
       showMessage('Inventory stock updated!');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to update stock quantity.');
+      showMessage('Failed to update stock quantity.', 'error');
+    }
+  };
+
+  const handleUpdateDiscount = async (id) => {
+    try {
+      const discount = newDiscount === '' ? 0 : Number(newDiscount);
+      await axiosClient.patch(`/vendor/products/${id}/discount`, { discountPercentage: discount }, vendorHeaders);
+      setEditingDiscountId(null);
+      showMessage(discount > 0 ? `${discount}% discount applied!` : 'Discount removed.');
+      fetchVendorProducts();
+    } catch (err) {
+      showMessage('Failed to update discount.', 'error');
     }
   };
 
@@ -145,13 +153,23 @@ const VendorProductsPage = () => {
       showMessage('Product removed from inventory.');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to delete product.');
+      showMessage('Failed to delete product.', 'error');
     }
   };
 
-  const showMessage = (msg) => {
+  const showMessage = (msg, type = 'success') => {
     setMessage(msg);
+    setMessageType(type);
     setTimeout(() => setMessage(''), 4000);
+  };
+
+  // Preview final price in add modal
+  const previewFinalPrice = () => {
+    const price = Number(formData.price) || 0;
+    const disc = Number(formData.discountPercentage) || 0;
+    if (price <= 0) return null;
+    const final = price * (1 - disc / 100);
+    return final.toFixed(2);
   };
 
   return (
@@ -163,9 +181,8 @@ const VendorProductsPage = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center">
               <Package className="w-7 h-7 mr-3 text-purple-400" /> Vendor Inventory & Price Management
             </h1>
-            <p className="text-xs text-slate-400">List new products, manage stock levels, and update catalog pricing</p>
+            <p className="text-xs text-slate-400">List products, manage stock, set discounts, and update catalog pricing</p>
           </div>
-
           <div className="flex items-center space-x-3">
             <button
               onClick={fetchVendorProducts}
@@ -174,7 +191,6 @@ const VendorProductsPage = () => {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center space-x-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
@@ -187,8 +203,14 @@ const VendorProductsPage = () => {
 
         {/* Notification Toast */}
         {message && (
-          <div className="bg-purple-500/20 border border-purple-500/40 text-purple-300 p-4 rounded-2xl text-sm flex items-center space-x-2">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <div className={`p-4 rounded-2xl text-sm flex items-center space-x-2 ${
+            messageType === 'error'
+              ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+              : 'bg-purple-500/20 border border-purple-500/40 text-purple-300'
+          }`}>
+            {messageType === 'error'
+              ? <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              : <CheckCircle2 className="w-5 h-5 flex-shrink-0" />}
             <span>{message}</span>
           </div>
         )}
@@ -204,7 +226,7 @@ const VendorProductsPage = () => {
             <Package className="w-16 h-16 text-slate-700 mx-auto" />
             <h2 className="text-xl font-bold text-white">No items in your vendor inventory</h2>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Start selling on ShopStack by adding your first product to our multi-vendor marketplace.
+              Start selling on ShopStack by adding your first product.
             </p>
             <button
               onClick={() => setShowAddModal(true)}
@@ -221,159 +243,193 @@ const VendorProductsPage = () => {
                   <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
                     <th className="p-4">Product</th>
                     <th className="p-4">Category</th>
-                    <th className="p-4">Price ($)</th>
-                    <th className="p-4">Stock Quantity</th>
-                    <th className="p-4">Approval Status</th>
+                    <th className="p-4">Price / Final</th>
+                    <th className="p-4">Discount</th>
+                    <th className="p-4">Stock</th>
+                    <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {products.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <img
-                            src={
-                              item.images && item.images.length > 0
-                                ? item.images[0]
-                                : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&auto=format&fit=crop&q=80'
-                            }
-                            alt={item.name}
-                            className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-800 flex-shrink-0"
-                          />
-                          <div>
-                            <div className="font-bold text-white line-clamp-1">{item.name}</div>
-                            <div className="text-xs text-slate-400">{item.brand || 'ShopStack'}</div>
-                          </div>
-                        </div>
-                      </td>
+                  {products.map((item) => {
+                    const discountPct = Number(item.discountPercentage || 0);
+                    const finalPrice = Number(item.finalPrice || item.price || 0);
+                    const originalPrice = Number(item.price || 0);
+                    const hasDiscount = discountPct > 0;
 
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2.5 py-1 bg-slate-950 text-indigo-300 rounded-full text-xs font-semibold border border-slate-800">
-                          <Tag className="w-3 h-3 mr-1" />
-                          {item.category?.name || 'General'}
-                        </span>
-                      </td>
-
-                      {/* Price Column */}
-                      <td className="p-4">
-                        {editingPriceId === item.id ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={newPrice}
-                              onChange={(e) => setNewPrice(e.target.value)}
-                              className="w-20 bg-slate-950 border border-purple-500 rounded-lg px-2 py-1 text-xs text-white"
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                        {/* Product */}
+                        <td className="p-4">
+                          <div className="flex items-center space-x-3">
+                            <img
+                              src={
+                                item.images && item.images.length > 0
+                                  ? item.images[0]
+                                  : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&auto=format&fit=crop&q=80'
+                              }
+                              alt={item.name}
+                              className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-800 flex-shrink-0"
                             />
-                            <button
-                              onClick={() => handleUpdatePrice(item.id)}
-                              className="px-2 py-1 bg-purple-600 text-white rounded text-xs"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingPriceId(null)}
-                              className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-xs"
-                            >
-                              X
-                            </button>
+                            <div>
+                              <div className="font-bold text-white line-clamp-1">{item.name}</div>
+                              <div className="text-xs text-slate-400">{item.brand || 'ShopStack'}</div>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-extrabold text-white">${Number(item.price).toFixed(2)}</span>
-                            <button
-                              onClick={() => {
-                                setEditingPriceId(item.id);
-                                setNewPrice(item.price);
-                              }}
-                              className="text-slate-500 hover:text-purple-400 p-1"
-                              title="Edit Price"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Stock Column */}
-                      <td className="p-4">
-                        {editingStockId === item.id ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              value={newStock}
-                              onChange={(e) => setNewStock(e.target.value)}
-                              className="w-16 bg-slate-950 border border-purple-500 rounded-lg px-2 py-1 text-xs text-white"
-                            />
-                            <button
-                              onClick={() => handleUpdateStock(item.id)}
-                              className="px-2 py-1 bg-purple-600 text-white rounded text-xs"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingStockId(null)}
-                              className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-xs"
-                            >
-                              X
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <span className={`font-bold ${item.stockQuantity < 5 ? 'text-amber-400' : 'text-slate-200'}`}>
-                              {item.stockQuantity} units
-                            </span>
-                            <button
-                              onClick={() => {
-                                setEditingStockId(item.id);
-                                setNewStock(item.stockQuantity);
-                              }}
-                              className="text-slate-500 hover:text-purple-400 p-1"
-                              title="Edit Stock"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                        {/* Category */}
+                        <td className="p-4">
+                          <span className="inline-flex items-center px-2.5 py-1 bg-slate-950 text-indigo-300 rounded-full text-xs font-semibold border border-slate-800">
+                            <Tag className="w-3 h-3 mr-1" />
+                            {item.category?.name || 'General'}
+                          </span>
+                        </td>
 
-                      {/* Approval Status */}
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-semibold">
-                          <ShieldCheck className="w-3.5 h-3.5 mr-1" /> {item.approvalStatus || 'APPROVED'}
-                        </span>
-                      </td>
+                        {/* Price Column */}
+                        <td className="p-4">
+                          {editingPriceId === item.id ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={newPrice}
+                                onChange={(e) => setNewPrice(e.target.value)}
+                                className="w-20 bg-slate-950 border border-purple-500 rounded-lg px-2 py-1 text-xs text-white"
+                              />
+                              <button onClick={() => handleUpdatePrice(item.id)} className="px-2 py-1 bg-purple-600 text-white rounded text-xs">Save</button>
+                              <button onClick={() => setEditingPriceId(null)} className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <div>
+                                {hasDiscount ? (
+                                  <>
+                                    <div className="font-extrabold text-emerald-400">₹{finalPrice.toFixed(2)}</div>
+                                    <div className="text-xs text-slate-500 line-through">₹{originalPrice.toFixed(2)}</div>
+                                  </>
+                                ) : (
+                                  <div className="font-extrabold text-white">₹{originalPrice.toFixed(2)}</div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => { setEditingPriceId(item.id); setNewPrice(item.price); }}
+                                className="text-slate-500 hover:text-purple-400 p-1"
+                                title="Edit Price"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
 
-                      {/* Actions */}
-                      <td className="p-4 text-right space-x-1">
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await axiosClient.get(`/products/${item.id}/inventory-history`, vendorHeaders);
-                              setHistoryLogs(res.data);
-                              setSelectedProductForHistory(item);
-                              setShowHistoryModal(true);
-                            } catch (e) {
-                              showMessage('No history records found or error fetching history.');
-                            }
-                          }}
-                          className="p-2 text-slate-400 hover:text-purple-400 rounded-lg hover:bg-slate-800 transition-all"
-                          title="View Stock History"
-                        >
-                          <History className="w-4 h-4" />
-                        </button>
+                        {/* Discount Column */}
+                        <td className="p-4">
+                          {editingDiscountId === item.id ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={newDiscount}
+                                onChange={(e) => setNewDiscount(e.target.value)}
+                                placeholder="0-100"
+                                className="w-16 bg-slate-950 border border-purple-500 rounded-lg px-2 py-1 text-xs text-white"
+                              />
+                              <span className="text-xs text-slate-400">%</span>
+                              <button onClick={() => handleUpdateDiscount(item.id)} className="px-2 py-1 bg-purple-600 text-white rounded text-xs">Save</button>
+                              <button onClick={() => setEditingDiscountId(null)} className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              {hasDiscount ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/15 text-rose-400 border border-rose-500/30 rounded-full text-xs font-bold">
+                                  <Zap className="w-3 h-3" />{discountPct.toFixed(0)}% OFF
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-500">No discount</span>
+                              )}
+                              <button
+                                onClick={() => { setEditingDiscountId(item.id); setNewDiscount(item.discountPercentage || ''); }}
+                                className="text-slate-500 hover:text-purple-400 p-1"
+                                title="Edit Discount"
+                              >
+                                <Percent className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
 
-                        <button
-                          onClick={() => handleDeleteProduct(item.id)}
-                          className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-all"
-                          title="Delete Product"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        {/* Stock Column */}
+                        <td className="p-4">
+                          {editingStockId === item.id ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                value={newStock}
+                                onChange={(e) => setNewStock(e.target.value)}
+                                className="w-16 bg-slate-950 border border-purple-500 rounded-lg px-2 py-1 text-xs text-white"
+                              />
+                              <button onClick={() => handleUpdateStock(item.id)} className="px-2 py-1 bg-purple-600 text-white rounded text-xs">Save</button>
+                              <button onClick={() => setEditingStockId(null)} className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <span className={`font-bold ${
+                                item.stockQuantity <= 0 ? 'text-rose-400' :
+                                item.stockQuantity < 5 ? 'text-amber-400' : 'text-slate-200'
+                              }`}>
+                                {item.stockQuantity} units
+                              </span>
+                              <button
+                                onClick={() => { setEditingStockId(item.id); setNewStock(item.stockQuantity); }}
+                                className="text-slate-500 hover:text-purple-400 p-1"
+                                title="Edit Stock"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Approval Status */}
+                        <td className="p-4">
+                          <span className="inline-flex items-center px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-semibold">
+                            <ShieldCheck className="w-3.5 h-3.5 mr-1" /> {item.approvalStatus || 'APPROVED'}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="p-4 text-right space-x-1">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await axiosClient.get(`/products/${item.id}/inventory-history`, vendorHeaders);
+                                setHistoryLogs(res.data);
+                                setSelectedProductForHistory(item);
+                                setShowHistoryModal(true);
+                              } catch (e) {
+                                showMessage('No history records found or error fetching history.', 'error');
+                              }
+                            }}
+                            className="p-2 text-slate-400 hover:text-purple-400 rounded-lg hover:bg-slate-800 transition-all"
+                            title="View Stock History"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteProduct(item.id)}
+                            className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-all"
+                            title="Delete Product"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -386,14 +442,15 @@ const VendorProductsPage = () => {
             <div className="bg-slate-900 border border-purple-900/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h2 className="text-lg font-bold text-white flex items-center">
-                  <Package className="w-5 h-5 mr-2 text-purple-400" /> Add Product to Vendor Inventory
+                  <Package className="w-5 h-5 mr-2 text-purple-400" /> Add Product to Inventory
                 </h2>
-                <button onClick={() => setShowAddModal(false)} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={() => setShowAddModal(false)} className="p-1 text-slate-400 hover:text-white cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleAddProductSubmit} className="space-y-4">
+                {/* Product Name */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-slate-300">Product Title</label>
                   <input
@@ -406,6 +463,7 @@ const VendorProductsPage = () => {
                   />
                 </div>
 
+                {/* Category + Brand */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="block text-xs font-medium text-slate-300">Category</label>
@@ -415,16 +473,12 @@ const VendorProductsPage = () => {
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
                     >
-                      <option value="">{categoryFetchError ? '⚠ Categories unavailable' : 'Select Category'}</option>
+                      <option value="">{categoryFetchError ? '⚠ Unavailable' : 'Select Category'}</option>
                       {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
+                        <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
-                    {categoryFetchError && (
-                      <p className="text-[11px] text-rose-400 mt-1">⚠ {categoryFetchError}</p>
-                    )}
+                    {categoryFetchError && <p className="text-[11px] text-rose-400 mt-1">⚠ {categoryFetchError}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -439,33 +493,63 @@ const VendorProductsPage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Price + Discount + Stock */}
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-xs font-medium text-slate-300">Price ($)</label>
+                    <label className="block text-xs font-medium text-slate-300">Price (₹)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      placeholder="99.99"
+                      placeholder="999.99"
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-xs font-medium text-slate-300">Initial Stock Quantity</label>
+                    <label className="block text-xs font-medium text-slate-300 flex items-center gap-1">
+                      <Percent className="w-3 h-3 text-rose-400" /> Discount %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={formData.discountPercentage}
+                      onChange={(e) => setFormData({ ...formData, discountPercentage: e.target.value })}
+                      placeholder="0"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-slate-300">Stock Qty</label>
                     <input
                       type="number"
                       value={formData.stockQuantity}
                       onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
                       placeholder="50"
                       required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                     />
                   </div>
                 </div>
 
+                {/* Final price preview */}
+                {previewFinalPrice() && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
+                    <span className="text-xs text-emerald-300 font-medium">
+                      Final Price after discount:
+                    </span>
+                    <span className="text-base font-extrabold text-emerald-400">
+                      ₹{previewFinalPrice()}
+                    </span>
+                  </div>
+                )}
+
+                {/* Image URL */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-slate-300">Product Image URL</label>
                   <input
@@ -475,9 +559,10 @@ const VendorProductsPage = () => {
                     placeholder="https://images.unsplash.com/photo-..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                   />
-                  <p className="text-[11px] text-slate-500 mt-0.5">Paste a full image URL (e.g. https://...)</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Paste a full image URL</p>
                 </div>
 
+                {/* Description */}
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-slate-300">Product Description</label>
                   <textarea
@@ -486,21 +571,21 @@ const VendorProductsPage = () => {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe product specifications, features, warranty..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                  ></textarea>
+                  />
                 </div>
 
+                {/* Buttons */}
                 <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
                   >
                     Cancel
                   </button>
-
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs shadow-md"
+                    className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer"
                   >
                     Save Product
                   </button>
@@ -510,7 +595,7 @@ const VendorProductsPage = () => {
           </div>
         )}
 
-        {/* Inventory History Log Modal */}
+        {/* Inventory History Modal */}
         {showHistoryModal && (
           <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-purple-900/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
@@ -521,7 +606,7 @@ const VendorProductsPage = () => {
                   </h2>
                   <p className="text-xs text-slate-400">{selectedProductForHistory?.name}</p>
                 </div>
-                <button onClick={() => setShowHistoryModal(false)} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={() => setShowHistoryModal(false)} className="p-1 text-slate-400 hover:text-white cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -534,14 +619,16 @@ const VendorProductsPage = () => {
                     <div key={log.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
                       <div>
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                          log.quantityChange > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          log.quantityChange > 0
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                         }`}>
                           {log.quantityChange > 0 ? `+${log.quantityChange}` : log.quantityChange} units
                         </span>
                         <div className="text-xs text-slate-300 font-medium mt-1">{log.changeReason}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-slate-400 font-bold">New Stock: {log.resultingStock}</div>
+                        <div className="text-xs text-slate-400 font-bold">Stock: {log.resultingStock}</div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                           {log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Recent'}
                         </div>
@@ -554,7 +641,7 @@ const VendorProductsPage = () => {
               <div className="flex justify-end pt-2 border-t border-slate-800">
                 <button
                   onClick={() => setShowHistoryModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   Close
                 </button>
