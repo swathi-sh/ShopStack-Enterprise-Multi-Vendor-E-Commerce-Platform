@@ -53,7 +53,7 @@ const AuthPage = () => {
         });
 
         dispatch(loginSuccess(response.data));
-        navigate('/dashboard');
+        navigate('/products');
       } catch (err) {
         const errorMessage =
           err.response?.data?.message ||
@@ -71,7 +71,7 @@ const AuthPage = () => {
         });
 
         dispatch(loginSuccess(response.data));
-        navigate('/dashboard');
+        navigate('/products');
       } catch (err) {
         const errorMessage =
           err.response?.data?.message || 'Sign in failed. Invalid email or password.';

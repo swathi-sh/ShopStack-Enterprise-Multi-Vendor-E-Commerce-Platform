@@ -59,6 +59,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public Customer Authentication Routes */}
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="/login" element={<AuthPage />} />
           <Route path="/register" element={<AuthPage />} />
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import axiosClient from '../api/axiosClient';
 import { setCartItems } from '../store/slices/cartSlice';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
@@ -10,6 +10,8 @@ const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -49,6 +51,10 @@ const ProductDetailPage = () => {
   }, [id]);
 
   const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post('/cart', { productId: product.id, quantity });
       const cartRes = await axiosClient.get('/cart');
@@ -60,6 +66,10 @@ const ProductDetailPage = () => {
   };
 
   const handleAddToWishlist = async () => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post(`/wishlist/${product.id}`);
       const wishRes = await axiosClient.get('/wishlist');
@@ -72,6 +82,10 @@ const ProductDetailPage = () => {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     setReviewSubmitting(true);
     try {
       await axiosClient.post(`/products/${id}/reviews`, {
@@ -222,14 +236,26 @@ const ProductDetailPage = () => {
                 <label className="text-xs font-medium text-slate-300 uppercase">Quantity:</label>
                 <div className="flex items-center border border-slate-800 rounded-xl bg-slate-950">
                   <button
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        navigate('/auth');
+                        return;
+                      }
+                      setQuantity((q) => Math.max(1, q - 1));
+                    }}
                     className="px-3 py-1.5 text-slate-400 hover:text-white font-bold cursor-pointer"
                   >
                     -
                   </button>
                   <span className="px-4 py-1.5 text-sm font-bold text-white">{quantity}</span>
                   <button
-                    onClick={() => setQuantity((q) => Math.min(product.stockQuantity, q + 1))}
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        navigate('/auth');
+                        return;
+                      }
+                      setQuantity((q) => Math.min(product.stockQuantity, q + 1));
+                    }}
                     className="px-3 py-1.5 text-slate-400 hover:text-white font-bold cursor-pointer"
                   >
                     +

@@ -158,6 +158,10 @@ const HomePage = () => {
 
   
   const handleAddToCart = async (productId) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post('/cart', {
         productId,
@@ -178,6 +182,10 @@ const HomePage = () => {
 
 
   const handleAddToWishlist = async (productId) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post(`/wishlist/${productId}`);
 
@@ -430,7 +438,7 @@ const HomePage = () => {
           <button
             type="button"
             onClick={() => navigate('/products')}
-            className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            className="text-xs font-medium text-indigo-400 hover:text-indigo-300 cursor-pointer"
           >
             Explore Catalog →
           </button>
@@ -471,7 +479,7 @@ const HomePage = () => {
           <button
             type="button"
             onClick={() => navigate('/products?sort=rating_desc')}
-            className="text-xs font-medium text-amber-400 hover:text-amber-300"
+            className="text-xs font-medium text-amber-400 hover:text-amber-300 cursor-pointer"
           >
             View Top Rated →
           </button>
@@ -512,7 +520,7 @@ const HomePage = () => {
           <button
             type="button"
             onClick={() => navigate('/products?sort=newest')}
-            className="text-xs font-medium text-purple-400 hover:text-purple-300"
+            className="text-xs font-medium text-purple-400 hover:text-purple-300 cursor-pointer"
           >
             View Newest →
           </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { fetchCategories, fetchCatalogProducts, setFilters, resetFilters } from '../store/slices/productSlice';
 import { setCartItems } from '../store/slices/cartSlice';
@@ -54,8 +54,10 @@ const colorMap = {
 
 const ProductCatalogPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const { products, categories, loading, categoryLoading, categoryError, pagination, filters } = useSelector((state) => state.products);
   const { items: wishlistItems } = useSelector((state) => state.wishlist);
 
@@ -163,6 +165,10 @@ const ProductCatalogPage = () => {
 
   // Handle quick category pill click
   const handleQuickCatClick = (catLabel) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     setCurrentPage(0);
 
     if (catLabel === 'All') {
@@ -189,6 +195,10 @@ const ProductCatalogPage = () => {
   };
 
   const handleCategorySelectChange = (e) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     const val = e.target.value;
     setSelectedCat(val);
     setCurrentPage(0);
@@ -206,12 +216,20 @@ const ProductCatalogPage = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     setCurrentPage(0);
     updateQueryParams({ search: searchTerm, page: 0 });
     loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
   };
 
   const handleResetFilters = () => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     setSearchTerm('');
     setSelectedCat('');
     setBrandFilter('');
@@ -227,6 +245,10 @@ const ProductCatalogPage = () => {
   };
 
   const handleAddToCart = async (productId) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post('/cart', { productId, quantity: 1 });
       const cartRes = await axiosClient.get('/cart');
@@ -238,6 +260,10 @@ const ProductCatalogPage = () => {
   };
 
   const handleAddToWishlist = async (productId) => {
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
     try {
       await axiosClient.post(`/wishlist/${productId}`);
       const wishRes = await axiosClient.get('/wishlist');
@@ -349,6 +375,10 @@ const ProductCatalogPage = () => {
                 <select
                   value={brandFilter}
                   onChange={(e) => {
+                    if (!isAuthenticated) {
+                      navigate('/auth');
+                      return;
+                    }
                     setBrandFilter(e.target.value);
                     setCurrentPage(0);
                     loadProducts(selectedCat, e.target.value, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
@@ -369,6 +399,10 @@ const ProductCatalogPage = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => {
+                    if (!isAuthenticated) {
+                      navigate('/auth');
+                      return;
+                    }
                     setSortBy(e.target.value);
                     setCurrentPage(0);
                     loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, e.target.value, 0);
@@ -409,6 +443,10 @@ const ProductCatalogPage = () => {
                 <select
                   value={ratingFilter}
                   onChange={(e) => {
+                    if (!isAuthenticated) {
+                      navigate('/auth');
+                      return;
+                    }
                     setRatingFilter(e.target.value);
                     setCurrentPage(0);
                     loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, e.target.value, sortBy, 0);
@@ -457,7 +495,13 @@ const ProductCatalogPage = () => {
             </h2>
 
             <button
-              onClick={() => loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, currentPage)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  navigate('/auth');
+                  return;
+                }
+                loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, currentPage);
+              }}
               className="p-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-slate-300 transition-all cursor-pointer"
               title="Refresh Products"
             >
@@ -508,7 +552,13 @@ const ProductCatalogPage = () => {
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-center space-x-3 pt-10">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    navigate('/auth');
+                    return;
+                  }
+                  setCurrentPage((prev) => Math.max(prev - 1, 0));
+                }}
                 disabled={currentPage === 0}
                 className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-all"
                 title="Previous Page"
@@ -521,7 +571,13 @@ const ProductCatalogPage = () => {
               </span>
 
               <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages - 1))}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    navigate('/auth');
+                    return;
+                  }
+                  setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages - 1));
+                }}
                 disabled={currentPage >= pagination.totalPages - 1}
                 className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-all"
                 title="Next Page"

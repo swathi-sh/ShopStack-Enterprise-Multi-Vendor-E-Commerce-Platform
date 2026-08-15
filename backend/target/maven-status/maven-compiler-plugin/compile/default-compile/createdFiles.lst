@@ -1,5 +1,6 @@
 com\shopstack\dto\ProductRequestDTO.class
 com\shopstack\service\CustomerServiceImpl.class
+com\shopstack\service\PaymentService.class
 com\shopstack\ShopstackBackendApplication.class
 com\shopstack\exception\GlobalExceptionHandler.class
 com\shopstack\service\ProductReviewService.class
@@ -12,11 +13,13 @@ com\shopstack\controller\CustomerController.class
 com\shopstack\entity\InventoryHistory.class
 com\shopstack\security\JwtAuthFilter.class
 com\shopstack\exception\ResourceNotFoundException.class
+com\shopstack\entity\PaymentStatus.class
 com\shopstack\service\WishlistService.class
 com\shopstack\repository\OrderRepository.class
 com\shopstack\service\VendorService.class
 com\shopstack\controller\VendorController.class
 com\shopstack\service\ProductReviewServiceImpl.class
+com\shopstack\dto\PaymentStatusResponse.class
 com\shopstack\dto\CreateOrderRequest.class
 com\shopstack\entity\Category.class
 com\shopstack\dto\OrderItemDTO.class
@@ -45,8 +48,10 @@ com\shopstack\dto\VendorLoginRequest.class
 com\shopstack\entity\Product.class
 com\shopstack\entity\Vendor.class
 com\shopstack\service\CartServiceImpl.class
+com\shopstack\entity\Payment.class
 com\shopstack\controller\OrderController.class
 com\shopstack\controller\CartController.class
+com\shopstack\dto\PaymentOrderResponse.class
 com\shopstack\dto\CartItemDTO.class
 com\shopstack\dto\RegisterRequest.class
 com\shopstack\dto\VendorRegisterRequest.class
@@ -55,6 +60,7 @@ com\shopstack\entity\Order.class
 com\shopstack\repository\InventoryHistoryRepository.class
 com\shopstack\dto\CategoryDTO.class
 com\shopstack\dto\CustomerDTO.class
+com\shopstack\service\PaymentServiceImpl.class
 com\shopstack\service\CartService.class
 com\shopstack\service\CategoryService.class
 com\shopstack\dto\AuthResponse.class
@@ -74,7 +80,9 @@ com\shopstack\dto\AddToCartRequest.class
 com\shopstack\dto\VendorAnalyticsDTO.class
 com\shopstack\controller\WishlistController.class
 com\shopstack\dto\InventoryHistoryDTO.class
+com\shopstack\repository\PaymentRepository.class
 com\shopstack\controller\PaymentController.class
+com\shopstack\dto\VerifyPaymentRequest.class
 com\shopstack\controller\ProductController.class
 com\shopstack\dto\ProductReviewRequest.class
 com\shopstack\service\OrderService.class

@@ -65,8 +65,8 @@ const VendorNavbar = () => {
                 }`
               }
             >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Sales Orders</span>
+               <ShoppingBag className="w-4 h-4" /> 
+              <span>Sales Orders</span> 
             </NavLink>
           </div>
 

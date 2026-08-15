@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Star, ShoppingCart, Heart, Tag, Store, PackageX, Zap } from 'lucide-react';
 
 const ProductCard = ({ product, onAddToCart, onAddToWishlist, isWishlisted }) => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
   const primaryImage = product?.images && product.images.length > 0 && product.images[0]
     ? product.images[0]
@@ -22,7 +24,13 @@ const ProductCard = ({ product, onAddToCart, onAddToWishlist, isWishlisted }) =>
       {/* Image Preview Container */}
       <div
         className="relative h-52 bg-slate-950 overflow-hidden cursor-pointer"
-        onClick={() => navigate(`/products/${product.id}`)}
+        onClick={() => {
+          if (!isAuthenticated) {
+            navigate('/auth');
+            return;
+          }
+          navigate(`/products/${product.id}`);
+        }}
       >
         <img
           src={primaryImage}
@@ -68,6 +76,10 @@ const ProductCard = ({ product, onAddToCart, onAddToWishlist, isWishlisted }) =>
         <button
           onClick={(e) => {
             e.stopPropagation();
+            if (!isAuthenticated) {
+              navigate('/auth');
+              return;
+            }
             onAddToWishlist && onAddToWishlist(product.id);
           }}
           className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md border transition-all cursor-pointer ${
@@ -98,7 +110,13 @@ const ProductCard = ({ product, onAddToCart, onAddToWishlist, isWishlisted }) =>
 
           {/* Product Name */}
           <h3
-            onClick={() => navigate(`/products/${product.id}`)}
+            onClick={() => {
+              if (!isAuthenticated) {
+                navigate('/auth');
+                return;
+              }
+              navigate(`/products/${product.id}`);
+            }}
             className="text-sm font-bold text-white tracking-tight hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2 leading-snug"
           >
             {product?.name}
@@ -155,7 +173,13 @@ const ProductCard = ({ product, onAddToCart, onAddToWishlist, isWishlisted }) =>
 
           {/* Add to Cart button */}
           <button
-            onClick={() => onAddToCart && onAddToCart(product.id)}
+            onClick={() => {
+              if (!isAuthenticated) {
+                navigate('/auth');
+                return;
+              }
+              onAddToCart && onAddToCart(product.id);
+            }}
             disabled={isOutOfStock}
             className={`w-full flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95 cursor-pointer ${
               isOutOfStock
