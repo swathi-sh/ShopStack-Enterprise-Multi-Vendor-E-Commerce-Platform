@@ -1,6 +1,7 @@
 package com.shopstack.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,9 +28,15 @@ public class Vendor {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "commission_rate", precision = 5, scale = 2)
+    private BigDecimal commissionRate = new BigDecimal("10.00");
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.VENDOR;
+
+    @Column(name = "active", columnDefinition = "boolean default true")
+    private Boolean active = true;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -109,12 +116,28 @@ public class Vendor {
         this.description = description;
     }
 
+    public BigDecimal getCommissionRate() {
+        return commissionRate != null ? commissionRate : new BigDecimal("10.00");
+    }
+
+    public void setCommissionRate(BigDecimal commissionRate) {
+        this.commissionRate = commissionRate;
+    }
+
     public Role getRole() {
         return role;
     }
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Boolean getActive() {
+        return active != null ? active : true;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 
     public LocalDateTime getCreatedAt() {

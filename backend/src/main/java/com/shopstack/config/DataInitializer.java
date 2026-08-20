@@ -17,17 +17,23 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final VendorRepository vendorRepository;
+    private final CustomerRepository customerRepository;
+    private final CouponRepository couponRepository;
     private final InventoryHistoryRepository inventoryHistoryRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataInitializer(CategoryRepository categoryRepository,
                            ProductRepository productRepository,
                            VendorRepository vendorRepository,
+                           CustomerRepository customerRepository,
+                           CouponRepository couponRepository,
                            InventoryHistoryRepository inventoryHistoryRepository,
                            PasswordEncoder passwordEncoder) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.vendorRepository = vendorRepository;
+        this.customerRepository = customerRepository;
+        this.couponRepository = couponRepository;
         this.inventoryHistoryRepository = inventoryHistoryRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -35,8 +41,14 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+        // Always ensure Admin User exists
+        createAdminIfMissing();
+
+        // Always ensure Sample Coupons exist
+        createCouponsIfMissing();
+
         if (categoryRepository.count() > 0 && productRepository.count() > 0) {
-            return; // Seed data already present — both tables populated
+            return; // Seed product data already present
         }
 
         // 1. Create Default Seed Vendors
@@ -171,5 +183,68 @@ public class DataInitializer implements CommandLineRunner {
                 "INITIAL_SEED_DATA"
         );
         inventoryHistoryRepository.save(history);
+    }
+
+    private void createAdminIfMissing() {
+        if (!customerRepository.existsByEmail("admin@shopstack.com")) {
+            Customer admin = new Customer();
+            admin.setName("Platform Admin");
+            admin.setEmail("admin@shopstack.com");
+            admin.setPassword(passwordEncoder.encode("Admin@123"));
+            admin.setPhone("1800-SHOPSTACK");
+            admin.setAddress("ShopStack HQ, Silicon Valley");
+            admin.setRole(Role.ADMIN);
+            customerRepository.save(admin);
+        }
+    }
+
+    private void createCouponsIfMissing() {
+        if (!couponRepository.existsByCode("WELCOME10")) {
+            Coupon c1 = new Coupon(
+                    "WELCOME10",
+                    "10% OFF on your first purchase!",
+                    DiscountType.PERCENTAGE,
+                    new BigDecimal("10.00"),
+                    new BigDecimal("200.00"),
+                    new BigDecimal("1000.00"),
+                    java.time.LocalDateTime.now().minusDays(10),
+                    java.time.LocalDateTime.now().plusYears(1),
+                    500,
+                    "Welcome Campaign"
+            );
+            couponRepository.save(c1);
+        }
+
+        if (!couponRepository.existsByCode("FESTIVE20")) {
+            Coupon c2 = new Coupon(
+                    "FESTIVE20",
+                    "20% OFF festive special discount up to ₹500",
+                    DiscountType.PERCENTAGE,
+                    new BigDecimal("20.00"),
+                    new BigDecimal("500.00"),
+                    new BigDecimal("500.00"),
+                    java.time.LocalDateTime.now().minusDays(5),
+                    java.time.LocalDateTime.now().plusMonths(6),
+                    200,
+                    "Festive Sale 2026"
+            );
+            couponRepository.save(c2);
+        }
+
+        if (!couponRepository.existsByCode("SUPER500")) {
+            Coupon c3 = new Coupon(
+                    "SUPER500",
+                    "Flat ₹500 OFF on orders above ₹2,000",
+                    DiscountType.FIXED,
+                    new BigDecimal("500.00"),
+                    new BigDecimal("2000.00"),
+                    null,
+                    java.time.LocalDateTime.now().minusDays(1),
+                    java.time.LocalDateTime.now().plusMonths(3),
+                    100,
+                    "Mega Saver"
+            );
+            couponRepository.save(c3);
+        }
     }
 }

@@ -6,20 +6,18 @@ import { setCartItems, setCartLoading } from '../store/slices/cartSlice';
 import {
   CreditCard, ShoppingBag, MapPin, ShieldCheck, CheckCircle,
   Package, Zap, ArrowLeft, Loader2, AlertTriangle, Lock, RefreshCw,
-  User, Phone, Home, Building2, Map, Hash
+  User, Phone, Home, Building2, Map, Hash, Ticket, Tag, Check, X
 } from 'lucide-react';
 
 // Load official Razorpay SDK script dynamically
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
-    // If already loaded and Razorpay is available, resolve immediately
     if (window.Razorpay) {
       resolve(true);
       return;
     }
     const existing = document.getElementById('razorpay-sdk');
     if (existing) {
-      // Script tag exists but Razorpay may not be ready yet — wait for it
       existing.onload = () => resolve(true);
       existing.onerror = () => resolve(false);
       return;
@@ -54,9 +52,14 @@ const CheckoutPage = () => {
   const [orderSuccess, setOrderSuccess] = useState('');
   const [paymentFailed, setPaymentFailed] = useState(false);
 
-  // Ref to track if payment was successfully completed — prevents ondismiss from
-  // overriding the success state (Razorpay closes the modal after handler is called,
-  // which also triggers ondismiss).
+  // Coupon Engine States
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMsg, setCouponMsg] = useState({ type: '', text: '' });
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+
   const paymentSucceeded = useRef(false);
 
   const fetchCart = async () => {
@@ -71,8 +74,18 @@ const CheckoutPage = () => {
     }
   };
 
+  const fetchActiveCoupons = async () => {
+    try {
+      const res = await axiosClient.get('/coupons/active');
+      setAvailableCoupons(res.data);
+    } catch (err) {
+      console.error('Failed to load active coupons', err);
+    }
+  };
+
   useEffect(() => {
     fetchCart();
+    fetchActiveCoupons();
   }, []);
 
   const handleInputChange = (e) => {
@@ -80,28 +93,70 @@ const CheckoutPage = () => {
     setAddressForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Calculate totals using finalPrice (discounted price)
-  const totals = cartItems.reduce((acc, item) => {
+  // Calculate cart totals
+  const rawTotals = cartItems.reduce((acc, item) => {
     const original = Number(item.product?.price || 0);
     const final = Number(item.product?.finalPrice || item.product?.price || 0);
     const qty = item.quantity || 1;
     acc.originalTotal += original * qty;
-    acc.finalTotal += final * qty;
-    acc.discount += (original - final) * qty;
+    acc.subtotal += final * qty;
+    acc.productDiscount += (original - final) * qty;
     return acc;
-  }, { originalTotal: 0, finalTotal: 0, discount: 0 });
+  }, { originalTotal: 0, subtotal: 0, productDiscount: 0 });
+
+  const finalOrderAmount = Math.max(0, rawTotals.subtotal - couponDiscount);
+
+  // Coupon application handler
+  const handleApplyCoupon = async (codeToApply) => {
+    const code = codeToApply || couponCodeInput;
+    if (!code || !code.trim()) {
+      setCouponMsg({ type: 'error', text: 'Please enter a coupon code.' });
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponMsg({ type: '', text: '' });
+
+    try {
+      const res = await axiosClient.post('/coupons/validate', {
+        code: code.trim(),
+        cartTotal: rawTotals.subtotal,
+      });
+
+      if (res.data.valid) {
+        setAppliedCoupon(res.data);
+        setCouponDiscount(Number(res.data.discountAmount || 0));
+        setCouponMsg({ type: 'success', text: res.data.message });
+      } else {
+        setAppliedCoupon(null);
+        setCouponDiscount(0);
+        setCouponMsg({ type: 'error', text: res.data.message });
+      }
+    } catch (err) {
+      setAppliedCoupon(null);
+      setCouponDiscount(0);
+      setCouponMsg({ type: 'error', text: err.response?.data?.message || 'Failed to validate coupon.' });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponCodeInput('');
+    setCouponMsg({ type: '', text: '' });
+  };
 
   const handleRazorpayPayment = async (e) => {
     if (e) e.preventDefault();
 
-    // Validate delivery address fields
     const { fullName, phone, address, city, state, pincode } = addressForm;
     if (!fullName.trim() || !phone.trim() || !address.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
       setErrorMsg('Please complete all delivery address fields before proceeding.');
       return;
     }
 
-    // Capture the shipping address at call time to avoid stale closure issues
     const shippingAddr = `${fullName.trim()}, Phone: ${phone.trim()}, ${address.trim()}, ${city.trim()}, ${state.trim()} - ${pincode.trim()}`;
 
     setErrorMsg('');
@@ -110,7 +165,6 @@ const CheckoutPage = () => {
     paymentSucceeded.current = false;
 
     try {
-      // 1. Load official Razorpay JS SDK
       const sdkLoaded = await loadRazorpayScript();
       if (!sdkLoaded || !window.Razorpay) {
         setErrorMsg('Unable to load Razorpay payment gateway. Please check your internet connection.');
@@ -118,20 +172,14 @@ const CheckoutPage = () => {
         return;
       }
 
-      // 2. Request Spring Boot backend to create Razorpay Order
-      // Total amount is calculated on the backend for security
       const orderRes = await axiosClient.post('/payment/create-order');
       const { key, amount, razorpay_order_id, razorpayOrderId } = orderRes.data;
       const rzpOrderId = razorpay_order_id || razorpayOrderId;
 
-      if (!key) {
-        throw new Error('Razorpay API key was not returned by the backend server.');
-      }
-      if (!rzpOrderId) {
-        throw new Error('Failed to obtain Razorpay order ID from backend.');
+      if (!key || !rzpOrderId) {
+        throw new Error('Failed to obtain Razorpay order credentials from backend.');
       }
 
-      // 3. Format phone for Razorpay prefill (10 digits Indian format)
       const cleanedPhone = phone ? phone.replace(/[^\d]/g, '') : '';
       const validContact = cleanedPhone.length >= 10 ? cleanedPhone.slice(-10) : '9876543210';
 
@@ -150,15 +198,13 @@ const CheckoutPage = () => {
         },
         notes: {
           shippingAddress: shippingAddr,
+          couponCode: appliedCoupon ? appliedCoupon.code : '',
         },
         theme: {
           color: '#6366f1',
         },
 
-        // 4. This handler fires ONLY on successful payment
         handler: async (response) => {
-          // Mark payment as succeeded BEFORE anything else to prevent
-          // ondismiss from overriding the success state
           paymentSucceeded.current = true;
           try {
             const verifyRes = await axiosClient.post('/payment/verify', {
@@ -166,22 +212,20 @@ const CheckoutPage = () => {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
               shippingAddress: shippingAddr,
+              couponCode: appliedCoupon ? appliedCoupon.code : null,
             });
 
-            // On SUCCESS: Clear cart state, show success message, redirect to orders
             dispatch(setCartItems([]));
             setPaymentFailed(false);
             setErrorMsg('');
             setOrderSuccess(`Order #${verifyRes.data.id} confirmed! 🎉 Payment verified successfully.`);
             setTimeout(() => navigate('/orders'), 2500);
           } catch (verifyErr) {
-            // Payment was captured by Razorpay, but our backend verify failed
-            // This is rare — the payment is captured but order not created
             paymentSucceeded.current = false;
             setPaymentFailed(true);
             setErrorMsg(
               verifyErr.response?.data?.message ||
-              'Payment was received but order creation failed. Please contact support with your payment ID: ' +
+              'Payment was received but order creation failed. Please contact support with payment ID: ' +
               response.razorpay_payment_id
             );
           } finally {
@@ -190,17 +234,11 @@ const CheckoutPage = () => {
         },
 
         modal: {
-          // ondismiss fires when modal is closed — either by user OR after handler completes.
-          // We use paymentSucceeded.current to distinguish the two cases.
           ondismiss: () => {
-            if (paymentSucceeded.current) {
-              // Modal closed naturally after successful payment — do nothing
-              return;
-            }
+            if (paymentSucceeded.current) return;
             setPaying(false);
             setPaymentFailed(true);
-            setErrorMsg('Payment was cancelled. Your cart items remain safe. You can retry anytime.');
-            // Record cancellation in backend (best-effort, ignore errors)
+            setErrorMsg('Payment was cancelled. Your cart items remain safe.');
             axiosClient.post('/payment/cancel', { razorpay_order_id: rzpOrderId }).catch(() => {});
           },
         },
@@ -208,14 +246,12 @@ const CheckoutPage = () => {
 
       const razorpayInstance = new window.Razorpay(options);
 
-      // payment.failed fires for declined cards, insufficient funds, etc.
       razorpayInstance.on('payment.failed', function (response) {
-        if (paymentSucceeded.current) return; // Ignore if success already triggered
+        if (paymentSucceeded.current) return;
         setPaying(false);
         setPaymentFailed(true);
-        const errDesc = response?.error?.description || response?.error?.reason || 'Transaction declined.';
-        const errCode = response?.error?.code ? ` (${response.error.code})` : '';
-        setErrorMsg(`Payment failed: ${errDesc}${errCode} Please try a different payment method.`);
+        const errDesc = response?.error?.description || 'Transaction declined.';
+        setErrorMsg(`Payment failed: ${errDesc} Please try a different payment method.`);
       });
 
       razorpayInstance.open();
@@ -223,7 +259,7 @@ const CheckoutPage = () => {
     } catch (err) {
       setPaying(false);
       setPaymentFailed(true);
-      setErrorMsg(err.response?.data?.message || err.message || 'Payment initialization failed. Please try again.');
+      setErrorMsg(err.response?.data?.message || err.message || 'Payment initialization failed.');
     }
   };
 
@@ -265,7 +301,7 @@ const CheckoutPage = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center">
               <CreditCard className="w-7 h-7 mr-3 text-indigo-400" /> Secure Checkout
             </h1>
-            <p className="text-xs text-slate-400">Review your order details and pay via Razorpay</p>
+            <p className="text-xs text-slate-400">Review order details, apply coupons & pay via Razorpay</p>
           </div>
           <button
             onClick={() => navigate('/cart')}
@@ -286,7 +322,7 @@ const CheckoutPage = () => {
           </div>
         )}
 
-        {/* Failure / Cancelled alert banner */}
+        {/* Failure alert banner */}
         {errorMsg && (
           <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-2xl text-sm space-y-2">
             <div className="flex items-center space-x-2 font-bold text-rose-400">
@@ -294,22 +330,12 @@ const CheckoutPage = () => {
               <span>{paymentFailed ? 'Payment Issue' : 'Notice'}</span>
             </div>
             <p className="text-xs leading-relaxed text-slate-300">{errorMsg}</p>
-            {paymentFailed && (
-              <div className="pt-2 flex items-center gap-3">
-                <button
-                  onClick={handleRazorpayPayment}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Retry Payment
-                </button>
-              </div>
-            )}
           </div>
         )}
 
         {!orderSuccess && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            {/* Left Column: Delivery Address Form + Order Items Summary */}
+            {/* Left Column: Delivery Address + Order Items Summary */}
             <div className="lg:col-span-3 space-y-6">
 
               {/* Delivery Address Section */}
@@ -319,7 +345,6 @@ const CheckoutPage = () => {
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  {/* Full Name */}
                   <div className="space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <User className="w-3.5 h-3.5 text-indigo-400" /> Full Name *
@@ -335,7 +360,6 @@ const CheckoutPage = () => {
                     />
                   </div>
 
-                  {/* Phone */}
                   <div className="space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <Phone className="w-3.5 h-3.5 text-indigo-400" /> Phone Number *
@@ -351,7 +375,6 @@ const CheckoutPage = () => {
                     />
                   </div>
 
-                  {/* Street Address */}
                   <div className="sm:col-span-2 space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <Home className="w-3.5 h-3.5 text-indigo-400" /> Street Address / House No *
@@ -367,7 +390,6 @@ const CheckoutPage = () => {
                     />
                   </div>
 
-                  {/* City */}
                   <div className="space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <Building2 className="w-3.5 h-3.5 text-indigo-400" /> City *
@@ -383,7 +405,6 @@ const CheckoutPage = () => {
                     />
                   </div>
 
-                  {/* State */}
                   <div className="space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <Map className="w-3.5 h-3.5 text-indigo-400" /> State *
@@ -399,7 +420,6 @@ const CheckoutPage = () => {
                     />
                   </div>
 
-                  {/* Pincode */}
                   <div className="sm:col-span-2 space-y-1">
                     <label className="text-slate-400 font-medium flex items-center gap-1">
                       <Hash className="w-3.5 h-3.5 text-indigo-400" /> Pincode *
@@ -429,8 +449,6 @@ const CheckoutPage = () => {
                   {cartItems.map((item) => {
                     const originalPrice = Number(item.product?.price || 0);
                     const finalPrice = Number(item.product?.finalPrice || item.product?.price || 0);
-                    const discountPct = Number(item.product?.discountPercentage || 0);
-                    const hasItemDiscount = discountPct > 0;
                     const qty = item.quantity || 1;
 
                     return (
@@ -449,14 +467,6 @@ const CheckoutPage = () => {
                           <p className="text-xs text-slate-400">{item.product?.vendor?.businessName}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs font-bold text-indigo-300">₹{finalPrice.toFixed(2)}</span>
-                            {hasItemDiscount && (
-                              <span className="text-[10px] text-slate-500 line-through">₹{originalPrice.toFixed(2)}</span>
-                            )}
-                            {hasItemDiscount && (
-                              <span className="text-[10px] text-rose-400 font-bold flex items-center gap-0.5">
-                                <Zap className="w-2.5 h-2.5" />{discountPct.toFixed(0)}% OFF
-                              </span>
-                            )}
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -471,8 +481,88 @@ const CheckoutPage = () => {
 
             </div>
 
-            {/* Right Column: Price Summary + Pay Button */}
+            {/* Right Column: Coupon Section + Payment Summary + Pay Button */}
             <div className="lg:col-span-2 space-y-4">
+
+              {/* Coupon Engine Box */}
+              <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+                <h2 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                  <Ticket className="w-5 h-5 text-amber-400" /> Apply Coupon Code
+                </h2>
+
+                {appliedCoupon ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-amber-400 font-mono text-sm tracking-wider">{appliedCoupon.code}</span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">APPLIED</span>
+                      </div>
+                      <p className="text-xs text-emerald-300 mt-1 font-bold">
+                        🎉 Saving ₹{couponDiscount.toFixed(2)} on this order!
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="p-1.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-xl border border-slate-800 transition-all cursor-pointer"
+                      title="Remove Coupon"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCodeInput}
+                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE (e.g. WELCOME10)"
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white uppercase font-mono placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        onClick={() => handleApplyCoupon()}
+                        disabled={couponLoading || !couponCodeInput.trim()}
+                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-extrabold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        {couponLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                      </button>
+                    </div>
+
+                    {couponMsg.text && (
+                      <p className={`text-xs font-medium ${couponMsg.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {couponMsg.text}
+                      </p>
+                    )}
+
+                    {/* Available Promotions Quick Click */}
+                    {availableCoupons.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <p className="text-[11px] font-bold text-slate-400">Available Promotional Codes:</p>
+                        <div className="space-y-1.5">
+                          {availableCoupons.slice(0, 3).map((c) => (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                setCouponCodeInput(c.code);
+                                handleApplyCoupon(c.code);
+                              }}
+                              className="p-2.5 bg-slate-950 hover:bg-slate-800/80 border border-slate-800/80 hover:border-amber-500/40 rounded-xl flex items-center justify-between cursor-pointer transition-all group"
+                            >
+                              <div>
+                                <span className="font-mono font-black text-amber-400 text-xs tracking-wider">{c.code}</span>
+                                <p className="text-[10px] text-slate-400 line-clamp-1">{c.description}</p>
+                              </div>
+                              <span className="text-[10px] font-bold text-indigo-400 group-hover:underline">Use</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Summary */}
               <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-5 sticky top-6">
                 <h2 className="text-base font-bold text-white border-b border-slate-800 pb-3">
                   Payment Summary
@@ -481,31 +571,27 @@ const CheckoutPage = () => {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between text-slate-400">
                     <span>Subtotal ({cartItems.length} items)</span>
-                    <span className="text-slate-200">₹{totals.originalTotal.toFixed(2)}</span>
+                    <span className="text-slate-200">₹{rawTotals.subtotal.toFixed(2)}</span>
                   </div>
-                  {totals.discount > 0 && (
-                    <div className="flex justify-between text-emerald-400">
+
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-amber-400 font-bold">
                       <span className="flex items-center gap-1">
-                        <Zap className="w-3.5 h-3.5" /> Discount Savings
+                        <Ticket className="w-3.5 h-3.5" /> Coupon ({appliedCoupon?.code})
                       </span>
-                      <span className="font-bold">− ₹{totals.discount.toFixed(2)}</span>
+                      <span>− ₹{couponDiscount.toFixed(2)}</span>
                     </div>
                   )}
+
                   <div className="flex justify-between text-slate-400">
                     <span>Delivery Charge</span>
                     <span className="text-emerald-400 font-semibold">FREE</span>
                   </div>
+
                   <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
-                    <span className="font-bold text-white text-base">Total Amount</span>
-                    <span className="text-2xl font-black text-indigo-400">₹{totals.finalTotal.toFixed(2)}</span>
+                    <span className="font-bold text-white text-base">Net Total Amount</span>
+                    <span className="text-2xl font-black text-indigo-400">₹{finalOrderAmount.toFixed(2)}</span>
                   </div>
-                  {totals.discount > 0 && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
-                      <p className="text-emerald-400 text-xs font-semibold">
-                        🎉 Total savings of ₹{totals.discount.toFixed(2)} on this order!
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Pay with Razorpay Button */}
@@ -522,7 +608,7 @@ const CheckoutPage = () => {
                   ) : (
                     <>
                       <Lock className="w-4 h-4" />
-                      <span>Pay with Razorpay</span>
+                      <span>Pay ₹{finalOrderAmount.toFixed(2)} with Razorpay</span>
                     </>
                   )}
                 </button>
@@ -531,41 +617,8 @@ const CheckoutPage = () => {
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Razorpay Official Checkout · SSL Encrypted</span>
                 </div>
-
-                <div className="flex items-center justify-center gap-2 flex-wrap pt-2 border-t border-slate-800/80">
-                  {['NetBanking (SBI/HDFC)', 'UPI (success@razorpay)', 'Domestic Cards'].map((m) => (
-                    <span key={m} className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                      {m}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Razorpay Test Mode Guidance Helper 
-                <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 space-y-2 text-xs">
-                  <div className="flex items-center gap-2 text-indigo-300 font-bold">
-                    <Zap className="w-4 h-4 text-amber-400" />
-                    <span>Test Payment Flow Guide</span>
-                  </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
-                    To complete a successful test payment in Razorpay Test Mode:
-                  </p>
-                  <div className="space-y-1.5 pt-1 text-[11px]">
-                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800/80">
-                      <span className="font-bold text-emerald-400 block">1. Netbanking (Instant Test)</span>
-                      <span className="text-slate-400">Choose <strong className="text-white">SBI or HDFC</strong> in popup → click <strong className="text-emerald-400">Success</strong> on test bank page.</span>
-                    </div>
-                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800/80">
-                      <span className="font-bold text-indigo-400 block">2. UPI / QR</span>
-                      <span className="text-slate-400">Enter UPI ID: <code className="text-indigo-300 font-mono">success@razorpay</code></span>
-                    </div>
-                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800/80">
-                      <span className="font-bold text-purple-400 block">3. Domestic Test Cards</span>
-                      <span className="text-slate-400">Mastercard: <code className="text-purple-300 font-mono">5123 4567 8901 2345</code> or Visa: <code className="text-purple-300 font-mono">4000 0000 0000 0002</code> (Expiry: 12/30, CVV: 123)</span>
-                    </div>
-                  </div>
-                </div>
-                */}
               </div>
+
             </div>
           </div>
         )}

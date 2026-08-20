@@ -13,6 +13,7 @@ public class VendorDTO {
     private String address;
     private String description;
     private Role role;
+    private Boolean active;
     private LocalDateTime createdAt;
 
     public VendorDTO() {
@@ -26,6 +27,7 @@ public class VendorDTO {
         this.address = vendor.getAddress();
         this.description = vendor.getDescription();
         this.role = vendor.getRole();
+        this.active = vendor.getActive();
         this.createdAt = vendor.getCreatedAt();
     }
 
@@ -83,6 +85,14 @@ public class VendorDTO {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 
     public LocalDateTime getCreatedAt() {

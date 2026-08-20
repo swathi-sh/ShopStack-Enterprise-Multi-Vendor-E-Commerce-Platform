@@ -242,30 +242,33 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public List<ProductDTO> getFeaturedProducts() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "rating", "reviewCount"));
-        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
-                .getContent().stream()
-                .map(ProductDTO::new)
-                .collect(Collectors.toList());
+        List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
+        if (list.isEmpty()) {
+            list = productRepository.findAll(pageable).getContent();
+        }
+        return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ProductDTO> getNewArrivals() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
-                .getContent().stream()
-                .map(ProductDTO::new)
-                .collect(Collectors.toList());
+        List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
+        if (list.isEmpty()) {
+            list = productRepository.findAll(pageable).getContent();
+        }
+        return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ProductDTO> getBestSellers() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "reviewCount", "rating"));
-        return productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable)
-                .getContent().stream()
-                .map(ProductDTO::new)
-                .collect(Collectors.toList());
+        List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
+        if (list.isEmpty()) {
+            list = productRepository.findAll(pageable).getContent();
+        }
+        return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
     @Override
@@ -277,8 +280,11 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductDTO> getProductsByCategory(Long categoryId) {
-        return productRepository.findByApprovalStatusAndCategoryId(ApprovalStatus.APPROVED, categoryId)
-                .stream().map(ProductDTO::new).collect(Collectors.toList());
+        List<Product> list = productRepository.findByApprovalStatusAndCategoryId(ApprovalStatus.APPROVED, categoryId);
+        if (list.isEmpty()) {
+            list = productRepository.filterProducts(null, categoryId, null, null, null);
+        }
+        return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
     @Override

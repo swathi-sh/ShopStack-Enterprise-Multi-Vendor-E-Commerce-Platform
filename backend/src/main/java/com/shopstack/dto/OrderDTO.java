@@ -12,6 +12,9 @@ public class OrderDTO {
     private Long id;
     private CustomerDTO customer;
     private BigDecimal totalAmount;
+    private BigDecimal grossAmount;
+    private String couponCode;
+    private BigDecimal discountAmount;
     private OrderStatus status;
     private String shippingAddress;
     private List<OrderItemDTO> items;
@@ -24,6 +27,9 @@ public class OrderDTO {
         this.id = order.getId();
         this.customer = order.getCustomer() != null ? new CustomerDTO(order.getCustomer()) : null;
         this.totalAmount = order.getTotalAmount();
+        this.grossAmount = order.getGrossAmount();
+        this.couponCode = order.getCouponCode();
+        this.discountAmount = order.getDiscountAmount();
         this.status = order.getStatus();
         this.shippingAddress = order.getShippingAddress();
         this.items = order.getItems() != null ? order.getItems().stream().map(OrderItemDTO::new).collect(Collectors.toList()) : null;
@@ -52,6 +58,30 @@ public class OrderDTO {
 
     public void setTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
+    }
+
+    public BigDecimal getGrossAmount() {
+        return grossAmount;
+    }
+
+    public void setGrossAmount(BigDecimal grossAmount) {
+        this.grossAmount = grossAmount;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public void setCouponCode(String couponCode) {
+        this.couponCode = couponCode;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
     }
 
     public OrderStatus getStatus() {

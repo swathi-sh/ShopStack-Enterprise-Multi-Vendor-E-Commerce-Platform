@@ -1,5 +1,6 @@
 package com.shopstack.service;
 
+import com.shopstack.dto.ApplyCouponResponse;
 import com.shopstack.dto.CreateOrderRequest;
 import com.shopstack.dto.OrderDTO;
 import com.shopstack.dto.OrderItemDTO;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +26,9 @@ public class OrderServiceImpl implements OrderService {
     private final VendorRepository vendorRepository;
     private final ProductRepository productRepository;
     private final InventoryHistoryRepository inventoryHistoryRepository;
+    private final CouponService couponService;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
@@ -31,7 +36,10 @@ public class OrderServiceImpl implements OrderService {
                             CustomerRepository customerRepository,
                             VendorRepository vendorRepository,
                             ProductRepository productRepository,
-                            InventoryHistoryRepository inventoryHistoryRepository) {
+                            InventoryHistoryRepository inventoryHistoryRepository,
+                            CouponService couponService,
+                            CouponRepository couponRepository,
+                            CouponUsageRepository couponUsageRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
@@ -39,6 +47,9 @@ public class OrderServiceImpl implements OrderService {
         this.vendorRepository = vendorRepository;
         this.productRepository = productRepository;
         this.inventoryHistoryRepository = inventoryHistoryRepository;
+        this.couponService = couponService;
+        this.couponRepository = couponRepository;
+        this.couponUsageRepository = couponUsageRepository;
     }
 
     @Override
@@ -52,7 +63,7 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Cannot place order with an empty shopping cart.");
         }
 
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal grossTotal = BigDecimal.ZERO;
         Order order = new Order();
         order.setCustomer(customer);
         order.setShippingAddress(request.getShippingAddress() != null && !request.getShippingAddress().isBlank()
@@ -82,19 +93,55 @@ public class OrderServiceImpl implements OrderService {
             );
             inventoryHistoryRepository.save(history);
 
-            // Use finalPrice if available (with discount applied), otherwise fall back to price
+            // Use finalPrice if available, otherwise price
             BigDecimal effectivePrice = product.getFinalPrice() != null ? product.getFinalPrice() : product.getPrice();
             BigDecimal itemTotal = effectivePrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-            total = total.add(itemTotal);
+            grossTotal = grossTotal.add(itemTotal);
 
-            OrderItem orderItem = new OrderItem(order, product, product.getVendor(), cartItem.getQuantity(), effectivePrice);
+            // Calculate Vendor Commission
+            Vendor vendor = product.getVendor();
+            BigDecimal commRate = (vendor != null && vendor.getCommissionRate() != null)
+                    ? vendor.getCommissionRate()
+                    : new BigDecimal("10.00");
+
+            BigDecimal commAmount = itemTotal.multiply(commRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            BigDecimal vendorEarn = itemTotal.subtract(commAmount);
+
+            OrderItem orderItem = new OrderItem(order, product, vendor, cartItem.getQuantity(), effectivePrice, commRate, commAmount, vendorEarn);
             orderItems.add(orderItem);
         }
 
-        order.setTotalAmount(total);
+        order.setGrossAmount(grossTotal);
+
+        // Apply Coupon logic if requested
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            ApplyCouponResponse couponRes = couponService.validateAndCalculateDiscount(request.getCouponCode(), grossTotal, customerEmail);
+            if (couponRes.isValid()) {
+                discountAmount = couponRes.getDiscountAmount();
+                order.setCouponCode(couponRes.getCode());
+                order.setDiscountAmount(discountAmount);
+            }
+        }
+
+        BigDecimal netTotal = grossTotal.subtract(discountAmount);
+        if (netTotal.compareTo(BigDecimal.ZERO) < 0) netTotal = BigDecimal.ZERO;
+
+        order.setTotalAmount(netTotal);
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
+
+        // Record Coupon Usage if coupon was applied
+        if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
+            couponRepository.findByCode(order.getCouponCode()).ifPresent(coupon -> {
+                coupon.setUsedCount(coupon.getUsedCount() + 1);
+                couponRepository.save(coupon);
+
+                CouponUsage usage = new CouponUsage(coupon, customer, savedOrder, order.getDiscountAmount());
+                couponUsageRepository.save(usage);
+            });
+        }
 
         // Clear cart
         cartItemRepository.deleteByCustomerId(customer.getId());

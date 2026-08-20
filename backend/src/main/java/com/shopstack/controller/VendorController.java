@@ -1,6 +1,7 @@
 package com.shopstack.controller;
 
 import com.shopstack.dto.*;
+import com.shopstack.service.AdminDashboardService;
 import com.shopstack.service.OrderService;
 import com.shopstack.service.ProductService;
 import com.shopstack.service.VendorService;
@@ -22,13 +23,16 @@ public class VendorController {
     private final VendorService vendorService;
     private final ProductService productService;
     private final OrderService orderService;
+    private final AdminDashboardService adminDashboardService;
 
     public VendorController(VendorService vendorService,
                             ProductService productService,
-                            OrderService orderService) {
+                            OrderService orderService,
+                            AdminDashboardService adminDashboardService) {
         this.vendorService = vendorService;
         this.productService = productService;
         this.orderService = orderService;
+        this.adminDashboardService = adminDashboardService;
     }
 
     @GetMapping("/profile")
@@ -108,5 +112,11 @@ public class VendorController {
     public ResponseEntity<List<OrderItemDTO>> getVendorSalesOrders(Authentication authentication) {
         String email = authentication.getName();
         return ResponseEntity.ok(orderService.getVendorSalesOrders(email));
+    }
+
+    @GetMapping("/earnings")
+    public ResponseEntity<VendorEarningsDTO> getVendorEarnings(Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(adminDashboardService.getVendorEarnings(email));
     }
 }

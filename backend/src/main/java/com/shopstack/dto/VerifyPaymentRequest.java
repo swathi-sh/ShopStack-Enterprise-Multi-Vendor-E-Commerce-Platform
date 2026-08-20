@@ -24,6 +24,8 @@ public class VerifyPaymentRequest {
     @NotBlank(message = "Shipping address is required")
     private String shippingAddress;
 
+    private String couponCode;
+
     public VerifyPaymentRequest() {
     }
 
@@ -64,5 +66,13 @@ public class VerifyPaymentRequest {
 
     public void setShippingAddress(String shippingAddress) {
         this.shippingAddress = shippingAddress;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public void setCouponCode(String couponCode) {
+        this.couponCode = couponCode;
     }
 }

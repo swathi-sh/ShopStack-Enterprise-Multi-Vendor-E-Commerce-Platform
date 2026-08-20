@@ -12,6 +12,9 @@ public class OrderItemDTO {
     private VendorDTO vendor;
     private Integer quantity;
     private BigDecimal priceAtPurchase;
+    private BigDecimal commissionRate;
+    private BigDecimal commissionAmount;
+    private BigDecimal vendorEarning;
 
     public OrderItemDTO() {
     }
@@ -24,6 +27,9 @@ public class OrderItemDTO {
         this.vendor = item.getVendor() != null ? new VendorDTO(item.getVendor()) : null;
         this.quantity = item.getQuantity();
         this.priceAtPurchase = item.getPriceAtPurchase();
+        this.commissionRate = item.getCommissionRate();
+        this.commissionAmount = item.getCommissionAmount();
+        this.vendorEarning = item.getVendorEarning();
     }
 
     public Long getId() {
@@ -80,5 +86,29 @@ public class OrderItemDTO {
 
     public void setPriceAtPurchase(BigDecimal priceAtPurchase) {
         this.priceAtPurchase = priceAtPurchase;
+    }
+
+    public BigDecimal getCommissionRate() {
+        return commissionRate;
+    }
+
+    public void setCommissionRate(BigDecimal commissionRate) {
+        this.commissionRate = commissionRate;
+    }
+
+    public BigDecimal getCommissionAmount() {
+        return commissionAmount;
+    }
+
+    public void setCommissionAmount(BigDecimal commissionAmount) {
+        this.commissionAmount = commissionAmount;
+    }
+
+    public BigDecimal getVendorEarning() {
+        return vendorEarning;
+    }
+
+    public void setVendorEarning(BigDecimal vendorEarning) {
+        this.vendorEarning = vendorEarning;
     }
 }

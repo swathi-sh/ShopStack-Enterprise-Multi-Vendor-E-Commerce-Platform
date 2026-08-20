@@ -7,6 +7,8 @@ public class CreateOrderRequest {
     @NotBlank(message = "Shipping address is required")
     private String shippingAddress;
 
+    private String couponCode;
+
     public CreateOrderRequest() {
     }
 
@@ -16,5 +18,13 @@ public class CreateOrderRequest {
 
     public void setShippingAddress(String shippingAddress) {
         this.shippingAddress = shippingAddress;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public void setCouponCode(String couponCode) {
+        this.couponCode = couponCode;
     }
 }

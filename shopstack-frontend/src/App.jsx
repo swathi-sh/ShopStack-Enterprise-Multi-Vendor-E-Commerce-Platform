@@ -21,6 +21,20 @@ import VendorDashboardPage from './pages/VendorDashboardPage';
 import VendorProductsPage from './pages/VendorProductsPage';
 import VendorOrdersPage from './pages/VendorOrdersPage';
 
+// Admin Components & Pages
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminCommissionsPage from './pages/AdminCommissionsPage';
+import AdminCouponsPage from './pages/AdminCouponsPage';
+import AdminAuthPage from './pages/AdminAuthPage';
+import AdminVendorManagementPage from './pages/AdminVendorManagementPage';
+import AdminProductVisibilityPage from './pages/AdminProductVisibilityPage';
+import AdminMarketplaceAnalyticsPage from './pages/AdminMarketplaceAnalyticsPage';
+import AdminOrderMonitoringPage from './pages/AdminOrderMonitoringPage';
+import AdminSystemMonitoringPage from './pages/AdminSystemMonitoringPage';
+import AdminBusinessReportsPage from './pages/AdminBusinessReportsPage';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
+import AdminNavbar from './components/AdminNavbar';
+
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedVendorRoute from './components/ProtectedVendorRoute';
 import Navbar from './components/Navbar';
@@ -53,6 +67,19 @@ const VendorLayout = () => {
   );
 };
 
+// Layout wrapper for admin portal pages
+const AdminLayout = () => {
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+      <AdminNavbar />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
 function App() {
   return (
     <Provider store={store}>
@@ -66,6 +93,9 @@ function App() {
           {/* Public Vendor Authentication Routes */}
           <Route path="/vendor/login" element={<VendorAuthPage />} />
           <Route path="/vendor/register" element={<VendorAuthPage />} />
+
+          {/* Public Admin Authentication Route */}
+          <Route path="/admin/login" element={<AdminAuthPage />} />
 
           {/* Public Customer & Catalog Routes */}
           <Route element={<CustomerLayout />}>
@@ -93,6 +123,21 @@ function App() {
               <Route path="/vendor/dashboard" element={<VendorDashboardPage />} />
               <Route path="/vendor/products" element={<VendorProductsPage />} />
               <Route path="/vendor/orders" element={<VendorOrdersPage />} />
+            </Route>
+          </Route>
+
+          {/* Protected Admin Routes */}
+          <Route element={<ProtectedAdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/analytics" element={<AdminMarketplaceAnalyticsPage />} />
+              <Route path="/admin/vendors" element={<AdminVendorManagementPage />} />
+              <Route path="/admin/products" element={<AdminProductVisibilityPage />} />
+              <Route path="/admin/orders" element={<AdminOrderMonitoringPage />} />
+              <Route path="/admin/system" element={<AdminSystemMonitoringPage />} />
+              <Route path="/admin/reports" element={<AdminBusinessReportsPage />} />
+              <Route path="/admin/commissions" element={<AdminCommissionsPage />} />
+              <Route path="/admin/coupons" element={<AdminCouponsPage />} />
             </Route>
           </Route>
 

@@ -2,6 +2,7 @@ package com.shopstack.service;
 
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
+import com.shopstack.dto.ApplyCouponResponse;
 import com.shopstack.dto.OrderDTO;
 import com.shopstack.dto.PaymentOrderResponse;
 import com.shopstack.dto.PaymentStatusResponse;
@@ -38,19 +39,28 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final InventoryHistoryRepository inventoryHistoryRepository;
+    private final CouponService couponService;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                               CustomerRepository customerRepository,
                               CartItemRepository cartItemRepository,
                               OrderRepository orderRepository,
                               ProductRepository productRepository,
-                              InventoryHistoryRepository inventoryHistoryRepository) {
+                              InventoryHistoryRepository inventoryHistoryRepository,
+                              CouponService couponService,
+                              CouponRepository couponRepository,
+                              CouponUsageRepository couponUsageRepository) {
         this.paymentRepository = paymentRepository;
         this.customerRepository = customerRepository;
         this.cartItemRepository = cartItemRepository;
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.inventoryHistoryRepository = inventoryHistoryRepository;
+        this.couponService = couponService;
+        this.couponRepository = couponRepository;
+        this.couponUsageRepository = couponUsageRepository;
     }
 
     @Override
@@ -163,11 +173,7 @@ public class PaymentServiceImpl implements PaymentService {
         // 2. Fetch cart items
         List<CartItem> cartItems = cartItemRepository.findByCustomerId(customer.getId());
         if (cartItems.isEmpty()) {
-            // Cart is empty — this can happen if the cart was cleared by a previous successful
-            // order for the same Razorpay order ID but the response was lost. Mark as FAILED
-            // with a more descriptive message.
-            logger.warn("Cart empty for customer {} during verify for razorpay order {}. " +
-                            "Possible duplicate verify call after successful order.",
+            logger.warn("Cart empty for customer {} during verify for razorpay order {}.",
                     customerEmail, request.getRazorpay_order_id());
             payment.setStatus(PaymentStatus.FAILED);
             paymentRepository.save(payment);
@@ -199,7 +205,7 @@ public class PaymentServiceImpl implements PaymentService {
                 : (customer.getAddress() != null ? customer.getAddress() : "Default Address"));
         order.setStatus(OrderStatus.CONFIRMED);
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal grossTotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
         for (CartItem cartItem : cartItems) {
@@ -222,20 +228,55 @@ public class PaymentServiceImpl implements PaymentService {
             // Use effective price (finalPrice if present, otherwise price)
             BigDecimal effectivePrice = product.getFinalPrice() != null ? product.getFinalPrice() : product.getPrice();
             BigDecimal itemTotal = effectivePrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-            totalAmount = totalAmount.add(itemTotal);
+            grossTotal = grossTotal.add(itemTotal);
 
-            OrderItem orderItem = new OrderItem(order, product, product.getVendor(), cartItem.getQuantity(), effectivePrice);
+            // Commission Calculation
+            Vendor vendor = product.getVendor();
+            BigDecimal commRate = (vendor != null && vendor.getCommissionRate() != null)
+                    ? vendor.getCommissionRate()
+                    : new BigDecimal("10.00");
+            BigDecimal commAmount = itemTotal.multiply(commRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            BigDecimal vendorEarn = itemTotal.subtract(commAmount);
+
+            OrderItem orderItem = new OrderItem(order, product, vendor, cartItem.getQuantity(), effectivePrice, commRate, commAmount, vendorEarn);
             orderItems.add(orderItem);
         }
 
-        order.setTotalAmount(totalAmount);
+        order.setGrossAmount(grossTotal);
+
+        // Coupon application if couponCode passed
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            ApplyCouponResponse couponRes = couponService.validateAndCalculateDiscount(request.getCouponCode(), grossTotal, customerEmail);
+            if (couponRes.isValid()) {
+                discountAmount = couponRes.getDiscountAmount();
+                order.setCouponCode(couponRes.getCode());
+                order.setDiscountAmount(discountAmount);
+            }
+        }
+
+        BigDecimal netTotal = grossTotal.subtract(discountAmount);
+        if (netTotal.compareTo(BigDecimal.ZERO) < 0) netTotal = BigDecimal.ZERO;
+
+        order.setTotalAmount(netTotal);
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
 
+        // Record Coupon Usage
+        if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
+            couponRepository.findByCode(order.getCouponCode()).ifPresent(coupon -> {
+                coupon.setUsedCount(coupon.getUsedCount() + 1);
+                couponRepository.save(coupon);
+
+                CouponUsage usage = new CouponUsage(coupon, customer, savedOrder, order.getDiscountAmount());
+                couponUsageRepository.save(usage);
+            });
+        }
+
         // 6. Link Payment to Order
         payment.setOrder(savedOrder);
-        payment.setAmount(totalAmount);
+        payment.setAmount(netTotal);
         paymentRepository.save(payment);
 
         // 7. Clear Cart

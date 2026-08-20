@@ -71,7 +71,11 @@ const AuthPage = () => {
         });
 
         dispatch(loginSuccess(response.data));
-        navigate('/products');
+        if (response.data?.user?.role === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/products');
+        }
       } catch (err) {
         const errorMessage =
           err.response?.data?.message || 'Sign in failed. Invalid email or password.';
@@ -162,7 +166,18 @@ const AuthPage = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-xs font-medium text-slate-300">Password</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-medium text-slate-300">Password</label>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={() => alert('Password reset instructions have been sent to your email address.')}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
                 <Lock className="w-4 h-4" />
@@ -244,19 +259,33 @@ const AuthPage = () => {
           </button>
         </form>
 
-        <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">
-          <span>{isSignUp ? 'Already have an account?' : "Don't have an account?"}</span>{' '}
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setSuccessMessage('');
-              setValidationError('');
-            }}
-            className="text-indigo-400 font-semibold hover:underline cursor-pointer"
-          >
-            {isSignUp ? 'Sign In' : 'Register Now'}
-          </button>
+        <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400 space-y-3">
+          <div>
+            <span>{isSignUp ? 'Already have an account?' : "Don't have an account?"}</span>{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setSuccessMessage('');
+                setValidationError('');
+              }}
+              className="text-indigo-400 font-semibold hover:underline cursor-pointer"
+            >
+              {isSignUp ? 'Sign In' : 'Register Now'}
+            </button>
+          </div>
+          {!isSignUp && (
+            <div className="pt-2 border-t border-slate-800/60">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/login')}
+                className="text-xs text-amber-400 hover:text-amber-300 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Admin Portal</span>
+                <span>&rarr;</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

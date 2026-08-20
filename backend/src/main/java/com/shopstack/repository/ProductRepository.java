@@ -24,7 +24,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     List<Product> findByApprovalStatusAndCategoryId(ApprovalStatus approvalStatus, Long categoryId);
 
-    @Query("SELECT p FROM Product p WHERE p.approvalStatus = :status " +
+    @Query("SELECT p FROM Product p WHERE (:status IS NULL OR p.approvalStatus = :status OR p.approvalStatus IS NULL) " +
            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
            "AND (:search IS NULL OR LOWER(p.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.brand) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.category.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%')) " +
            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
@@ -37,7 +37,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             @Param("maxPrice") BigDecimal maxPrice
     );
 
-    @Query("SELECT p FROM Product p WHERE p.approvalStatus = :status " +
+    @Query("SELECT p FROM Product p WHERE (:status IS NULL OR p.approvalStatus = :status OR p.approvalStatus IS NULL) " +
            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
            "AND (:brand IS NULL OR LOWER(p.brand) = LOWER(CAST(:brand AS string))) " +
            "AND (:search IS NULL OR LOWER(p.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.brand) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(p.category.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%')) " +
@@ -56,4 +56,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     );
 
     long countByVendorId(Long vendorId);
+
+    long countByStockQuantityEquals(Integer stockQuantity);
+
+    long countByStockQuantityLessThanEqual(Integer stockQuantity);
+
+    @Query("SELECT p.category.name, COUNT(p) FROM Product p GROUP BY p.category.name")
+    List<Object[]> findCategoryProductCounts();
 }

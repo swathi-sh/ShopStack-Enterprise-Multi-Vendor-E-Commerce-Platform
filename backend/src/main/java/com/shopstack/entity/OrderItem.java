@@ -29,6 +29,15 @@ public class OrderItem {
     @Column(name = "price_at_purchase", nullable = false)
     private BigDecimal priceAtPurchase;
 
+    @Column(name = "commission_rate", precision = 5, scale = 2)
+    private BigDecimal commissionRate;
+
+    @Column(name = "commission_amount", precision = 12, scale = 2)
+    private BigDecimal commissionAmount;
+
+    @Column(name = "vendor_earning", precision = 12, scale = 2)
+    private BigDecimal vendorEarning;
+
     public OrderItem() {
     }
 
@@ -38,6 +47,17 @@ public class OrderItem {
         this.vendor = vendor;
         this.quantity = quantity;
         this.priceAtPurchase = priceAtPurchase;
+    }
+
+    public OrderItem(Order order, Product product, Vendor vendor, Integer quantity, BigDecimal priceAtPurchase, BigDecimal commissionRate, BigDecimal commissionAmount, BigDecimal vendorEarning) {
+        this.order = order;
+        this.product = product;
+        this.vendor = vendor;
+        this.quantity = quantity;
+        this.priceAtPurchase = priceAtPurchase;
+        this.commissionRate = commissionRate;
+        this.commissionAmount = commissionAmount;
+        this.vendorEarning = vendorEarning;
     }
 
     public Long getId() {
@@ -86,5 +106,29 @@ public class OrderItem {
 
     public void setPriceAtPurchase(BigDecimal priceAtPurchase) {
         this.priceAtPurchase = priceAtPurchase;
+    }
+
+    public BigDecimal getCommissionRate() {
+        return commissionRate;
+    }
+
+    public void setCommissionRate(BigDecimal commissionRate) {
+        this.commissionRate = commissionRate;
+    }
+
+    public BigDecimal getCommissionAmount() {
+        return commissionAmount;
+    }
+
+    public void setCommissionAmount(BigDecimal commissionAmount) {
+        this.commissionAmount = commissionAmount;
+    }
+
+    public BigDecimal getVendorEarning() {
+        return vendorEarning;
+    }
+
+    public void setVendorEarning(BigDecimal vendorEarning) {
+        this.vendorEarning = vendorEarning;
     }
 }
