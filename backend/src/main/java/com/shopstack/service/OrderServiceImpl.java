@@ -29,6 +29,8 @@ public class OrderServiceImpl implements OrderService {
     private final CouponService couponService;
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
+    private final WarehouseService warehouseService;
+    private final ShipmentRepository shipmentRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
@@ -39,7 +41,9 @@ public class OrderServiceImpl implements OrderService {
                             InventoryHistoryRepository inventoryHistoryRepository,
                             CouponService couponService,
                             CouponRepository couponRepository,
-                            CouponUsageRepository couponUsageRepository) {
+                            CouponUsageRepository couponUsageRepository,
+                            WarehouseService warehouseService,
+                            ShipmentRepository shipmentRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
@@ -50,6 +54,8 @@ public class OrderServiceImpl implements OrderService {
         this.couponService = couponService;
         this.couponRepository = couponRepository;
         this.couponUsageRepository = couponUsageRepository;
+        this.warehouseService = warehouseService;
+        this.shipmentRepository = shipmentRepository;
     }
 
     @Override
@@ -132,6 +138,12 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
+        // Attempt auto-allocation from active warehouses if stock exists
+        try {
+            warehouseService.autoAllocateOrderIfPossible(savedOrder.getId());
+        } catch (Exception ignored) {
+        }
+
         // Record Coupon Usage if coupon was applied
         if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
             couponRepository.findByCode(order.getCouponCode()).ifPresent(coupon -> {
@@ -176,6 +188,19 @@ public class OrderServiceImpl implements OrderService {
     public OrderDTO updateOrderStatus(Long orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+
+        if (OrderStatus.DELIVERED.equals(status)) {
+            shipmentRepository.findByOrderId(order.getId()).ifPresentOrElse(
+                shipment -> {
+                    if (!ShipmentStatus.DELIVERED.equals(shipment.getStatus())) {
+                        throw new IllegalStateException("Order #" + order.getId() + " cannot be marked DELIVERED directly before shipment is DELIVERED. Current shipment status: " + shipment.getStatus());
+                    }
+                },
+                () -> {
+                    throw new IllegalStateException("Order #" + order.getId() + " cannot be marked DELIVERED directly without completing the shipment workflow.");
+                }
+            );
+        }
 
         order.setStatus(status);
         return new OrderDTO(orderRepository.save(order));

@@ -16,6 +16,8 @@ import {
   ShoppingBag,
   Activity,
   FileText,
+  Warehouse,
+  RotateCcw,
 } from 'lucide-react';
 
 const AdminNavbar = () => {
@@ -33,13 +35,14 @@ const AdminNavbar = () => {
   const navLinks = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+    { name: 'Warehouses', path: '/admin/warehouses', icon: Warehouse },
     { name: 'Vendors', path: '/admin/vendors', icon: Store },
     { name: 'Products', path: '/admin/products', icon: Package },
     { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
+    { name: 'Returns', path: '/admin/returns', icon: RotateCcw },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
-    /* { name: 'System', path: '/admin/system', icon: Activity }, */
     { name: 'Commissions', path: '/admin/commissions', icon: Percent },
-    /* { name: 'Coupons', path: '/admin/coupons', icon: Ticket }, */
+    { name: 'Coupons', path: '/admin/coupons', icon: Ticket },
   ];
 
   const isActive = (path) => location.pathname === path;

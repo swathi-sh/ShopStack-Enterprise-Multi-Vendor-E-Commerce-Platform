@@ -6,7 +6,7 @@ import { setCartItems, setCartLoading } from '../store/slices/cartSlice';
 import {
   CreditCard, ShoppingBag, MapPin, ShieldCheck, CheckCircle,
   Package, Zap, ArrowLeft, Loader2, AlertTriangle, Lock, RefreshCw,
-  User, Phone, Home, Building2, Map, Hash, Ticket, Tag, Check, X
+  User, Phone, Home, Building2, Map, Hash, Ticket, Tag, Check, X, Mail
 } from 'lucide-react';
 
 // Load official Razorpay SDK script dynamically
@@ -40,12 +40,26 @@ const CheckoutPage = () => {
   // Delivery Address Form Fields
   const [addressForm, setAddressForm] = useState({
     fullName: user?.name ? user.name : (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : ''),
+    email: user?.email || '',
     phone: user?.phone || '',
     address: user?.address || '',
     city: '',
     state: '',
     pincode: '',
   });
+
+  // Keep addressForm in sync if user profile loads after component mount
+  useEffect(() => {
+    if (user) {
+      setAddressForm((prev) => ({
+        ...prev,
+        fullName: prev.fullName || user.name || (user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : ''),
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+        address: prev.address || user.address || '',
+      }));
+    }
+  }, [user]);
 
   const [paying, setPaying] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -151,7 +165,7 @@ const CheckoutPage = () => {
   const handleRazorpayPayment = async (e) => {
     if (e) e.preventDefault();
 
-    const { fullName, phone, address, city, state, pincode } = addressForm;
+    const { fullName, email, phone, address, city, state, pincode } = addressForm;
     if (!fullName.trim() || !phone.trim() || !address.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
       setErrorMsg('Please complete all delivery address fields before proceeding.');
       return;
@@ -172,7 +186,9 @@ const CheckoutPage = () => {
         return;
       }
 
-      const orderRes = await axiosClient.post('/payment/create-order');
+      const orderRes = await axiosClient.post('/payment/create-order', {
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
+      });
       const { key, amount, razorpay_order_id, razorpayOrderId } = orderRes.data;
       const rzpOrderId = razorpay_order_id || razorpayOrderId;
 
@@ -180,8 +196,9 @@ const CheckoutPage = () => {
         throw new Error('Failed to obtain Razorpay order credentials from backend.');
       }
 
-      const cleanedPhone = phone ? phone.replace(/[^\d]/g, '') : '';
-      const validContact = cleanedPhone.length >= 10 ? cleanedPhone.slice(-10) : '9876543210';
+      const contactName = fullName.trim();
+      const contactEmail = (email || user?.email || 'customer@shopstack.com').trim();
+      const contactPhone = phone.trim();
 
       const options = {
         key: key,
@@ -192,9 +209,9 @@ const CheckoutPage = () => {
         order_id: rzpOrderId,
         remember_customer: false,
         prefill: {
-          name: fullName.trim(),
-          email: user?.email || 'customer@shopstack.com',
-          contact: validContact,
+          name: contactName,
+          email: contactEmail,
+          contact: contactPhone,
         },
         notes: {
           shippingAddress: shippingAddr,
@@ -355,6 +372,21 @@ const CheckoutPage = () => {
                       value={addressForm.fullName}
                       onChange={handleInputChange}
                       placeholder="e.g. John Doe"
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-400 font-medium flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-indigo-400" /> Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={addressForm.email}
+                      onChange={handleInputChange}
+                      placeholder="e.g. customer@example.com"
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
                     />

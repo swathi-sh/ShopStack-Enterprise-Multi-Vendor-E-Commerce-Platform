@@ -28,6 +28,10 @@ public class Customer {
     @Column(nullable = false)
     private Role role = Role.CUSTOMER;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "warehouse_id", nullable = true)
+    private Warehouse warehouse;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -113,6 +117,14 @@ public class Customer {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Warehouse getWarehouse() {
+        return warehouse;
+    }
+
+    public void setWarehouse(Warehouse warehouse) {
+        this.warehouse = warehouse;
     }
 
     public LocalDateTime getCreatedAt() {

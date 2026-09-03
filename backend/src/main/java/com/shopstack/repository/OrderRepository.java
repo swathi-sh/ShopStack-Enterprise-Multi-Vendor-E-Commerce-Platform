@@ -12,6 +12,7 @@ import java.util.List;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+    List<Order> findByWarehouseIdOrderByCreatedAtDesc(Long warehouseId);
 
     long countByStatus(OrderStatus status);
 

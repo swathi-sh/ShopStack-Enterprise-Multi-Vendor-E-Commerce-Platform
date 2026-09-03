@@ -7,6 +7,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +22,10 @@ public class DataInitializer implements CommandLineRunner {
     private final CustomerRepository customerRepository;
     private final CouponRepository couponRepository;
     private final InventoryHistoryRepository inventoryHistoryRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final WarehouseInventoryRepository warehouseInventoryRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     public DataInitializer(CategoryRepository categoryRepository,
                            ProductRepository productRepository,
@@ -28,24 +33,38 @@ public class DataInitializer implements CommandLineRunner {
                            CustomerRepository customerRepository,
                            CouponRepository couponRepository,
                            InventoryHistoryRepository inventoryHistoryRepository,
-                           PasswordEncoder passwordEncoder) {
+                           WarehouseRepository warehouseRepository,
+                           WarehouseInventoryRepository warehouseInventoryRepository,
+                           PasswordEncoder passwordEncoder,
+                           JdbcTemplate jdbcTemplate) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.vendorRepository = vendorRepository;
         this.customerRepository = customerRepository;
         this.couponRepository = couponRepository;
         this.inventoryHistoryRepository = inventoryHistoryRepository;
+        this.warehouseRepository = warehouseRepository;
+        this.warehouseInventoryRepository = warehouseInventoryRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+        // Drop outdated DB check constraints on enum fields to allow WAREHOUSE_ALLOCATED and READY_FOR_SHIPPING
+        fixDatabaseCheckConstraints();
         // Always ensure Admin User exists
         createAdminIfMissing();
 
+        // Always ensure Warehouse Staff User exists
+        createWarehouseStaffIfMissing();
+
         // Always ensure Sample Coupons exist
         createCouponsIfMissing();
+
+        // Ensure Warehouses exist
+        createWarehousesIfMissing();
 
         if (categoryRepository.count() > 0 && productRepository.count() > 0) {
             return; // Seed product data already present
@@ -198,6 +217,96 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    private void createWarehouseStaffIfMissing() {
+        // Generic staff default
+        if (!customerRepository.existsByEmail("staff@shopstack.com")) {
+            Customer staff = new Customer();
+            staff.setName("Warehouse Staff");
+            staff.setEmail("staff@shopstack.com");
+            staff.setPassword(passwordEncoder.encode("Staff@123"));
+            staff.setPhone("1800-WAREHOUSE");
+            staff.setAddress("ShopStack Logistics Hub");
+            staff.setRole(Role.WAREHOUSE_STAFF);
+            warehouseRepository.findByCode("WH-BLR").ifPresent(staff::setWarehouse);
+            customerRepository.save(staff);
+        }
+    }
+
+    private void createWarehousesIfMissing() {
+        Warehouse blrWh = warehouseRepository.findByCode("WH-BLR").orElseGet(() -> {
+            Warehouse w = new Warehouse();
+            w.setName("Bangalore Central Warehouse");
+            w.setCode("WH-BLR");
+            w.setLocation("Electronics City, Bangalore, Karnataka");
+            w.setContact("blr-manager@shopstack.com");
+            w.setStatus(WarehouseStatus.ACTIVE);
+            return warehouseRepository.save(w);
+        });
+
+        Warehouse hydWh = warehouseRepository.findByCode("WH-HYD").orElseGet(() -> {
+            Warehouse w = new Warehouse();
+            w.setName("Hyderabad Fulfillment Center");
+            w.setCode("WH-HYD");
+            w.setLocation("HITEC City, Hyderabad, Telangana");
+            w.setContact("hyd-manager@shopstack.com");
+            w.setStatus(WarehouseStatus.ACTIVE);
+            return warehouseRepository.save(w);
+        });
+
+        Warehouse delWh = warehouseRepository.findByCode("WH-DEL").orElseGet(() -> {
+            Warehouse w = new Warehouse();
+            w.setName("Delhi NCR Logistics Hub");
+            w.setCode("WH-DEL");
+            w.setLocation("Gurugram, Delhi NCR");
+            w.setContact("del-manager@shopstack.com");
+            w.setStatus(WarehouseStatus.ACTIVE);
+            return warehouseRepository.save(w);
+        });
+
+        Warehouse pneWh = warehouseRepository.findByCode("WH-PNE").orElseGet(() -> {
+            Warehouse w = new Warehouse();
+            w.setName("Pune Regional Warehouse");
+            w.setCode("WH-PNE");
+            w.setLocation("Hinjawadi IT Park, Pune, Maharashtra");
+            w.setContact("pne-manager@shopstack.com");
+            w.setStatus(WarehouseStatus.ACTIVE);
+            return warehouseRepository.save(w);
+        });
+
+        // Ensure city-specific staff accounts exist
+        createSpecificStaffIfMissing("blr@shopstack.com", "Bangalore Staff", blrWh);
+        createSpecificStaffIfMissing("hyd@shopstack.com", "Hyderabad Staff", hydWh);
+        createSpecificStaffIfMissing("del@shopstack.com", "Delhi Staff", delWh);
+        createSpecificStaffIfMissing("pne@shopstack.com", "Pune Staff", pneWh);
+
+        // Populate inventory for all products across active warehouses
+        List<Product> products = productRepository.findAll();
+        List<Warehouse> activeWarehouses = List.of(blrWh, hydWh, delWh, pneWh);
+        for (Warehouse wh : activeWarehouses) {
+            for (Product p : products) {
+                if (warehouseInventoryRepository.findByWarehouseIdAndProductId(wh.getId(), p.getId()).isEmpty()) {
+                    int qty = p.getStockQuantity() != null && p.getStockQuantity() > 0 ? p.getStockQuantity() : 15;
+                    WarehouseInventory inv = new WarehouseInventory(wh, p, qty, 0);
+                    warehouseInventoryRepository.save(inv);
+                }
+            }
+        }
+    }
+
+    private void createSpecificStaffIfMissing(String email, String name, Warehouse warehouse) {
+        if (!customerRepository.existsByEmail(email)) {
+            Customer staff = new Customer();
+            staff.setName(name);
+            staff.setEmail(email);
+            staff.setPassword(passwordEncoder.encode("Staff@123"));
+            staff.setPhone("9876543210");
+            staff.setAddress(warehouse.getLocation());
+            staff.setRole(Role.WAREHOUSE_STAFF);
+            staff.setWarehouse(warehouse);
+            customerRepository.save(staff);
+        }
+    }
+
     private void createCouponsIfMissing() {
         if (!couponRepository.existsByCode("WELCOME10")) {
             Coupon c1 = new Coupon(
@@ -245,6 +354,17 @@ public class DataInitializer implements CommandLineRunner {
                     "Mega Saver"
             );
             couponRepository.save(c3);
+        }
+    }
+
+    private void fixDatabaseCheckConstraints() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
+            jdbcTemplate.execute("ALTER TABLE warehouse_order_allocations DROP CONSTRAINT IF EXISTS warehouse_order_allocations_status_check");
+            jdbcTemplate.execute("ALTER TABLE stock_movement_logs DROP CONSTRAINT IF EXISTS stock_movement_logs_stage_check");
+            jdbcTemplate.execute("ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_status_check");
+        } catch (Exception e) {
+            // Silently ignore if constraints don't exist or DB dialect doesn't support IF EXISTS
         }
     }
 }

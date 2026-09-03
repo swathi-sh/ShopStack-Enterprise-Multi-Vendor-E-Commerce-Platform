@@ -9,6 +9,8 @@ public interface PaymentService {
 
     PaymentOrderResponse createPaymentOrder(String customerEmail);
 
+    PaymentOrderResponse createPaymentOrder(String customerEmail, String couponCode);
+
     OrderDTO verifyAndPlaceOrder(String customerEmail, VerifyPaymentRequest request);
 
     PaymentStatusResponse getPaymentStatusByOrderId(Long orderId);

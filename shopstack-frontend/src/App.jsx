@@ -32,8 +32,15 @@ import AdminMarketplaceAnalyticsPage from './pages/AdminMarketplaceAnalyticsPage
 import AdminOrderMonitoringPage from './pages/AdminOrderMonitoringPage';
 import AdminSystemMonitoringPage from './pages/AdminSystemMonitoringPage';
 import AdminBusinessReportsPage from './pages/AdminBusinessReportsPage';
+import AdminWarehousePage from './pages/AdminWarehousePage';
+import AdminReturnManagementPage from './pages/AdminReturnManagementPage';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import AdminNavbar from './components/AdminNavbar';
+
+// Warehouse Staff Components & Pages
+import WarehouseStaffDashboardPage from './pages/WarehouseStaffDashboardPage';
+import ProtectedWarehouseStaffRoute from './components/ProtectedWarehouseStaffRoute';
+import WarehouseStaffNavbar from './components/WarehouseStaffNavbar';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedVendorRoute from './components/ProtectedVendorRoute';
@@ -59,6 +66,19 @@ const VendorLayout = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
       <VendorNavbar />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+// Layout wrapper for warehouse staff portal pages
+const WarehouseStaffLayout = () => {
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+      <WarehouseStaffNavbar />
       <main className="flex-1">
         <Outlet />
       </main>
@@ -126,14 +146,23 @@ function App() {
             </Route>
           </Route>
 
+          {/* Protected Warehouse Staff Routes */}
+          <Route element={<ProtectedWarehouseStaffRoute />}>
+            <Route element={<WarehouseStaffLayout />}>
+              <Route path="/warehouse-staff/dashboard" element={<WarehouseStaffDashboardPage />} />
+            </Route>
+          </Route>
+
           {/* Protected Admin Routes */}
           <Route element={<ProtectedAdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/analytics" element={<AdminMarketplaceAnalyticsPage />} />
+              <Route path="/admin/warehouses" element={<AdminWarehousePage />} />
               <Route path="/admin/vendors" element={<AdminVendorManagementPage />} />
               <Route path="/admin/products" element={<AdminProductVisibilityPage />} />
               <Route path="/admin/orders" element={<AdminOrderMonitoringPage />} />
+              <Route path="/admin/returns" element={<AdminReturnManagementPage />} />
               <Route path="/admin/system" element={<AdminSystemMonitoringPage />} />
               <Route path="/admin/reports" element={<AdminBusinessReportsPage />} />
               <Route path="/admin/commissions" element={<AdminCommissionsPage />} />

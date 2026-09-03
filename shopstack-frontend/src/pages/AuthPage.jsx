@@ -71,8 +71,11 @@ const AuthPage = () => {
         });
 
         dispatch(loginSuccess(response.data));
-        if (response.data?.user?.role === 'ADMIN') {
+        const userRole = response.data?.user?.role;
+        if (userRole === 'ADMIN') {
           navigate('/admin/dashboard');
+        } else if (userRole === 'WAREHOUSE_STAFF') {
+          navigate('/warehouse-staff/dashboard');
         } else {
           navigate('/products');
         }
@@ -275,11 +278,21 @@ const AuthPage = () => {
             </button>
           </div>
           {!isSignUp && (
-            <div className="pt-2 border-t border-slate-800/60">
+            <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData((prev) => ({ ...prev, email: 'staff@shopstack.com', password: 'Staff@123' }));
+                }}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold hover:underline cursor-pointer"
+              >
+                Use Warehouse Staff Credentials
+              </button>
+              <span className="text-slate-700">&bull;</span>
               <button
                 type="button"
                 onClick={() => navigate('/admin/login')}
-                className="text-xs text-amber-400 hover:text-amber-300 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <span>Admin Portal</span>
                 <span>&rarr;</span>

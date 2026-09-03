@@ -1,5 +1,6 @@
 package com.shopstack.controller;
 
+import com.shopstack.dto.CreatePaymentOrderRequest;
 import com.shopstack.dto.OrderDTO;
 import com.shopstack.dto.PaymentOrderResponse;
 import com.shopstack.dto.PaymentStatusResponse;
@@ -26,9 +27,12 @@ public class PaymentController {
 
     
     @PostMapping("/create-order")
-    public ResponseEntity<Map<String, Object>> createPaymentOrder(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> createPaymentOrder(
+            Authentication authentication,
+            @RequestBody(required = false) CreatePaymentOrderRequest request) {
         String email = authentication.getName();
-        PaymentOrderResponse response = paymentService.createPaymentOrder(email);
+        String couponCode = request != null ? request.getCouponCode() : null;
+        PaymentOrderResponse response = paymentService.createPaymentOrder(email, couponCode);
 
         Map<String, Object> resultMap = new HashMap<>();
         resultMap.put("key", response.getKey());

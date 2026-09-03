@@ -42,6 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final CouponService couponService;
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
+    private final WarehouseService warehouseService;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                               CustomerRepository customerRepository,
@@ -51,7 +52,8 @@ public class PaymentServiceImpl implements PaymentService {
                               InventoryHistoryRepository inventoryHistoryRepository,
                               CouponService couponService,
                               CouponRepository couponRepository,
-                              CouponUsageRepository couponUsageRepository) {
+                              CouponUsageRepository couponUsageRepository,
+                              WarehouseService warehouseService) {
         this.paymentRepository = paymentRepository;
         this.customerRepository = customerRepository;
         this.cartItemRepository = cartItemRepository;
@@ -61,11 +63,18 @@ public class PaymentServiceImpl implements PaymentService {
         this.couponService = couponService;
         this.couponRepository = couponRepository;
         this.couponUsageRepository = couponUsageRepository;
+        this.warehouseService = warehouseService;
     }
 
     @Override
     @Transactional
     public PaymentOrderResponse createPaymentOrder(String customerEmail) {
+        return createPaymentOrder(customerEmail, null);
+    }
+
+    @Override
+    @Transactional
+    public PaymentOrderResponse createPaymentOrder(String customerEmail, String couponCode) {
         Customer customer = customerRepository.findByEmail(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found for email: " + customerEmail));
 
@@ -75,7 +84,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // Validate stock and calculate total amount on backend
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal grossTotal = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
             Product product = cartItem.getProduct();
             if (product.getStockQuantity() < cartItem.getQuantity()) {
@@ -85,11 +94,24 @@ public class PaymentServiceImpl implements PaymentService {
 
             BigDecimal effectivePrice = product.getFinalPrice() != null ? product.getFinalPrice() : product.getPrice();
             BigDecimal itemTotal = effectivePrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-            total = total.add(itemTotal);
+            grossTotal = grossTotal.add(itemTotal);
+        }
+
+        // Validate coupon on backend if couponCode provided
+        BigDecimal netTotal = grossTotal;
+        if (couponCode != null && !couponCode.isBlank()) {
+            ApplyCouponResponse couponRes = couponService.validateAndCalculateDiscount(couponCode, grossTotal, customerEmail);
+            if (!couponRes.isValid()) {
+                throw new RuntimeException("Coupon validation failed: " + couponRes.getMessage());
+            }
+            netTotal = couponRes.getNetTotal();
+            if (netTotal.compareTo(BigDecimal.ZERO) < 0) {
+                netTotal = BigDecimal.ZERO;
+            }
         }
 
         // Convert amount to paise (1 INR = 100 paise)
-        long amountInPaise = total.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).longValue();
+        long amountInPaise = netTotal.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).longValue();
 
         if (razorpayKeyId == null || razorpayKeyId.isBlank() || razorpayKeyId.contains("placeholder") ||
             razorpayKeySecret == null || razorpayKeySecret.isBlank() || razorpayKeySecret.contains("placeholder")) {
@@ -121,12 +143,12 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = new Payment();
         payment.setCustomer(customer);
         payment.setRazorpayOrderId(razorpayOrderId);
-        payment.setAmount(total);
+        payment.setAmount(netTotal);
         payment.setCurrency("INR");
         payment.setStatus(PaymentStatus.PENDING);
         paymentRepository.save(payment);
 
-        return new PaymentOrderResponse(razorpayKeyId, razorpayOrderId, amountInPaise, total, "INR");
+        return new PaymentOrderResponse(razorpayKeyId, razorpayOrderId, amountInPaise, netTotal, "INR");
     }
 
     @Override
@@ -262,6 +284,12 @@ public class PaymentServiceImpl implements PaymentService {
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
+
+        // Attempt auto-allocation from active warehouses if stock exists
+        try {
+            warehouseService.autoAllocateOrderIfPossible(savedOrder.getId());
+        } catch (Exception ignored) {
+        }
 
         // Record Coupon Usage
         if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {

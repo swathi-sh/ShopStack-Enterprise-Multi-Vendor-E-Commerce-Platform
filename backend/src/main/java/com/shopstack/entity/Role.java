@@ -3,5 +3,6 @@ package com.shopstack.entity;
 public enum Role {
     CUSTOMER,
     VENDOR,
-    ADMIN
+    ADMIN,
+    WAREHOUSE_STAFF
 }

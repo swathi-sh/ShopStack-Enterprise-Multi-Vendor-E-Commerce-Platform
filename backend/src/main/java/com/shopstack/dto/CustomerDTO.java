@@ -12,6 +12,8 @@ public class CustomerDTO {
     private String phone;
     private String address;
     private Role role;
+    private Long warehouseId;
+    private String warehouseName;
     private LocalDateTime createdAt;
 
     public CustomerDTO() {
@@ -25,6 +27,10 @@ public class CustomerDTO {
         this.address = customer.getAddress();
         this.role = customer.getRole();
         this.createdAt = customer.getCreatedAt();
+        if (customer.getWarehouse() != null) {
+            this.warehouseId = customer.getWarehouse().getId();
+            this.warehouseName = customer.getWarehouse().getName();
+        }
     }
 
     public Long getId() {
@@ -73,6 +79,22 @@ public class CustomerDTO {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Long getWarehouseId() {
+        return warehouseId;
+    }
+
+    public void setWarehouseId(Long warehouseId) {
+        this.warehouseId = warehouseId;
+    }
+
+    public String getWarehouseName() {
+        return warehouseName;
+    }
+
+    public void setWarehouseName(String warehouseName) {
+        this.warehouseName = warehouseName;
     }
 
     public LocalDateTime getCreatedAt() {

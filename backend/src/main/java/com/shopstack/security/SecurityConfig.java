@@ -76,7 +76,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/coupons/active").permitAll()
                 .requestMatchers("/api/categories/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/customers/**", "/api/cart/**", "/api/wishlist/**", "/api/orders/**", "/api/vendor/**", "/api/payment/**", "/api/coupons/**").authenticated()
+                .requestMatchers("/api/warehouse-staff/**").hasAnyRole("WAREHOUSE_STAFF", "ADMIN")
+                .requestMatchers("/api/customers/**", "/api/cart/**", "/api/wishlist/**", "/api/orders/**", "/api/vendor/**", "/api/payment/**", "/api/coupons/**", "/api/returns/**").authenticated()
                 .anyRequest().permitAll()
             );
 
