@@ -27,10 +27,12 @@ public class ShipmentServiceImpl implements ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final OrderRepository orderRepository;
+    private final NotificationService notificationService;
 
-    public ShipmentServiceImpl(ShipmentRepository shipmentRepository, OrderRepository orderRepository) {
+    public ShipmentServiceImpl(ShipmentRepository shipmentRepository, OrderRepository orderRepository, NotificationService notificationService) {
         this.shipmentRepository = shipmentRepository;
         this.orderRepository = orderRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -115,6 +117,13 @@ public class ShipmentServiceImpl implements ShipmentService {
         }
 
         Shipment updated = shipmentRepository.save(shipment);
+
+        if (ShipmentStatus.SHIPPED.equals(newStatus)) {
+            notificationService.sendOrderShippedEmail(order, updated);
+        } else if (ShipmentStatus.DELIVERED.equals(newStatus)) {
+            notificationService.sendOrderDeliveredEmail(order, updated);
+        }
+
         return new ShipmentDTO(updated);
     }
 

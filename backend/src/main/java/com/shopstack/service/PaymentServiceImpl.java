@@ -43,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
     private final WarehouseService warehouseService;
+    private final NotificationService notificationService;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                               CustomerRepository customerRepository,
@@ -53,7 +54,8 @@ public class PaymentServiceImpl implements PaymentService {
                               CouponService couponService,
                               CouponRepository couponRepository,
                               CouponUsageRepository couponUsageRepository,
-                              WarehouseService warehouseService) {
+                              WarehouseService warehouseService,
+                              NotificationService notificationService) {
         this.paymentRepository = paymentRepository;
         this.customerRepository = customerRepository;
         this.cartItemRepository = cartItemRepository;
@@ -64,6 +66,7 @@ public class PaymentServiceImpl implements PaymentService {
         this.couponRepository = couponRepository;
         this.couponUsageRepository = couponUsageRepository;
         this.warehouseService = warehouseService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -189,6 +192,9 @@ public class PaymentServiceImpl implements PaymentService {
             paymentRepository.save(payment);
             logger.error("Signature verification failed for order_id={} payment_id={}",
                     request.getRazorpay_order_id(), request.getRazorpay_payment_id());
+
+            notificationService.sendPaymentFailedEmail(customer, request.getRazorpay_order_id(), payment.getAmount(), "Invalid Razorpay payment signature.");
+
             throw new RuntimeException("Payment verification failed! Invalid Razorpay signature.");
         }
 
@@ -199,6 +205,9 @@ public class PaymentServiceImpl implements PaymentService {
                     customerEmail, request.getRazorpay_order_id());
             payment.setStatus(PaymentStatus.FAILED);
             paymentRepository.save(payment);
+
+            notificationService.sendPaymentFailedEmail(customer, request.getRazorpay_order_id(), payment.getAmount(), "Shopping cart is empty.");
+
             throw new RuntimeException("Your cart is empty. If you already placed an order successfully, " +
                     "please check your Orders page. Otherwise, add items to cart and retry.");
         }
@@ -209,6 +218,9 @@ public class PaymentServiceImpl implements PaymentService {
             if (product.getStockQuantity() < cartItem.getQuantity()) {
                 payment.setStatus(PaymentStatus.FAILED);
                 paymentRepository.save(payment);
+
+                notificationService.sendPaymentFailedEmail(customer, request.getRazorpay_order_id(), payment.getAmount(), "Insufficient stock for product: " + product.getName());
+
                 throw new RuntimeException("Insufficient stock for product: " + product.getName() +
                         ". Available: " + product.getStockQuantity() + ", required: " + cartItem.getQuantity());
             }
@@ -306,6 +318,10 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 7. Clear Cart
         cartItemRepository.deleteByCustomerId(customer.getId());
+
+        // 8. Trigger Notifications (PAYMENT_SUCCESS & ORDER_PLACED)
+        notificationService.sendPaymentSuccessEmail(savedOrder, payment);
+        notificationService.sendOrderPlacedEmail(savedOrder);
 
         logger.info("Payment verified and order {} created for customer {}", savedOrder.getId(), customerEmail);
         return new OrderDTO(savedOrder);

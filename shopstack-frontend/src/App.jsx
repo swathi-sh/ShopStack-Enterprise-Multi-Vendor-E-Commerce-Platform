@@ -117,16 +117,17 @@ function App() {
           {/* Public Admin Authentication Route */}
           <Route path="/admin/login" element={<AdminAuthPage />} />
 
-          {/* Public Customer & Catalog Routes */}
+          {/* Public Customer Routes */}
           <Route element={<CustomerLayout />}>
             <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<ProductCatalogPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
           </Route>
 
           {/* Protected Customer Routes */}
           <Route element={<ProtectedRoute />}>
             <Route element={<CustomerLayout />}>
+              <Route path="/products" element={<ProductCatalogPage />} />
+              <Route path="/products/:id" element={<ProductDetailPage />} />
+              <Route path="/catalog" element={<ProductCatalogPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/edit" element={<ProfilePage />} />

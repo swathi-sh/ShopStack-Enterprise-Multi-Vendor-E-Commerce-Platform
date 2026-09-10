@@ -78,6 +78,8 @@ const HomePage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const { isAuthenticated } = useSelector((state) => state.auth);
+
   const {
     categories = [],
     featuredProducts = [],
@@ -88,6 +90,15 @@ const HomePage = () => {
   const { items: wishlistItems = [] } = useSelector(
     (state) => state.wishlist
   );
+
+  // Navigate to catalog path; redirect unauthenticated users to login first
+  const navigateToCatalog = (path = '/products') => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: path } } });
+    } else {
+      navigate(path);
+    }
+  };
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -254,7 +265,7 @@ const HomePage = () => {
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
                   type="button"
-                  onClick={() => navigate(currentHero.ctaLink)}
+                  onClick={() => navigateToCatalog(currentHero.ctaLink)}
                   className="flex cursor-pointer items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-indigo-500 hover:shadow-indigo-500/25 active:scale-95"
                 >
                   <span>{currentHero.ctaText}</span>
@@ -383,7 +394,7 @@ const HomePage = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/products')}
+            onClick={() => navigateToCatalog('/products')}
             className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-indigo-400 transition-colors hover:text-indigo-300 sm:text-sm"
           >
             <span>View All</span>
@@ -396,7 +407,7 @@ const HomePage = () => {
           {categories.slice(0, 8).map((cat) => (
             <div
               key={cat.id}
-              onClick={() => navigate(`/products?category=${cat.id}`)}
+              onClick={() => navigateToCatalog(`/products?category=${cat.id}`)}
               className="group flex cursor-pointer flex-col items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-md transition-all duration-300 hover:scale-105 hover:border-indigo-500/50"
             >
               <div className="mb-3 h-14 w-14 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
@@ -433,7 +444,7 @@ const HomePage = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/products')}
+            onClick={() => navigateToCatalog('/products')}
             className="text-xs font-medium text-indigo-400 hover:text-indigo-300 cursor-pointer"
           >
             Explore Catalog →
@@ -474,7 +485,7 @@ const HomePage = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/products?sort=rating_desc')}
+            onClick={() => navigateToCatalog('/products?sort=rating_desc')}
             className="text-xs font-medium text-amber-400 hover:text-amber-300 cursor-pointer"
           >
             View Top Rated →
@@ -515,7 +526,7 @@ const HomePage = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/products?sort=newest')}
+            onClick={() => navigateToCatalog('/products?sort=newest')}
             className="text-xs font-medium text-purple-400 hover:text-purple-300 cursor-pointer"
           >
             View Newest →

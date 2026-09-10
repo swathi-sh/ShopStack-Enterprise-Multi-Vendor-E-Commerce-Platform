@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
 import { LayoutDashboard, User, LogOut, Menu, X, ShoppingBag, ShoppingCart, Heart, Package, Store, Home } from 'lucide-react';
@@ -8,10 +8,21 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { items: cartItems } = useSelector((state) => state.cart);
 
   const cartCount = cartItems ? cartItems.reduce((acc, item) => acc + item.quantity, 0) : 0;
+
+  // Guard navigation to catalog pages for unauthenticated users
+  const handleCatalogNav = (path = '/products') => {
+    setMobileMenuOpen(false);
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: path } } });
+    } else {
+      navigate(path);
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -47,8 +58,21 @@ const Navbar = () => {
               }
             >
               <Home className="w-4 h-4" />
-              <span>Catalog</span>
+              <span>Home</span>
             </NavLink>
+
+            <button
+              type="button"
+              onClick={() => handleCatalogNav('/products')}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                location.pathname === '/products' || location.pathname.startsWith('/products/')
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Catalog</span>
+            </button>
 
            
 
@@ -164,14 +188,14 @@ const Navbar = () => {
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 pt-2 pb-4 space-y-2">
-          <NavLink
-            to="/products"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800"
+          <button
+            type="button"
+            onClick={() => handleCatalogNav('/products')}
+            className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 w-full"
           >
             <ShoppingBag className="w-4 h-4" />
             <span>Product Catalog</span>
-          </NavLink>
+          </button>
           <NavLink
             to="/dashboard"
             onClick={() => setMobileMenuOpen(false)}

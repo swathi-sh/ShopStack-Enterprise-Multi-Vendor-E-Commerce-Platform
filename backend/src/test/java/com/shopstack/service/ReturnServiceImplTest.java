@@ -52,6 +52,8 @@ class ReturnServiceImplTest {
     private StockMovementLogRepository stockMovementLogRepository;
     @Mock
     private InventoryHistoryRepository inventoryHistoryRepository;
+    @Mock
+    private NotificationService notificationService;
 
     private ReturnServiceImpl returnService;
 
@@ -110,7 +112,8 @@ class ReturnServiceImplTest {
                 warehouseInventoryRepository,
                 productRepository,
                 stockMovementLogRepository,
-                inventoryHistoryRepository
+                inventoryHistoryRepository,
+                notificationService
         ) {
             @Override
             protected RazorpayClient createRazorpayClient() {

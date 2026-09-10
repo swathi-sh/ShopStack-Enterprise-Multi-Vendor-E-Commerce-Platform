@@ -44,6 +44,7 @@ public class ReturnServiceImpl implements ReturnService {
     private final ProductRepository productRepository;
     private final StockMovementLogRepository stockMovementLogRepository;
     private final InventoryHistoryRepository inventoryHistoryRepository;
+    private final NotificationService notificationService;
 
     public ReturnServiceImpl(ReturnRequestRepository returnRequestRepository,
                              OrderRepository orderRepository,
@@ -54,7 +55,8 @@ public class ReturnServiceImpl implements ReturnService {
                              WarehouseInventoryRepository warehouseInventoryRepository,
                              ProductRepository productRepository,
                              StockMovementLogRepository stockMovementLogRepository,
-                             InventoryHistoryRepository inventoryHistoryRepository) {
+                             InventoryHistoryRepository inventoryHistoryRepository,
+                             NotificationService notificationService) {
         this.returnRequestRepository = returnRequestRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -65,6 +67,7 @@ public class ReturnServiceImpl implements ReturnService {
         this.productRepository = productRepository;
         this.stockMovementLogRepository = stockMovementLogRepository;
         this.inventoryHistoryRepository = inventoryHistoryRepository;
+        this.notificationService = notificationService;
     }
 
     // ─── Customer: Submit Return Request ──────────────────────────────────
@@ -391,6 +394,8 @@ public class ReturnServiceImpl implements ReturnService {
                 order.setStatus(OrderStatus.REFUNDED);
                 orderRepository.save(order);
                 logger.info("Refund processed successfully for Return #{}, Order #{}", returnId, order.getId());
+
+                notificationService.sendRefundCompletedEmail(order, r);
             } else {
                 r.setReturnStatus(ReturnStatus.REFUND_INITIATED);
             }

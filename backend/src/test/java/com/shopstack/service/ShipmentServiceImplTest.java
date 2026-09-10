@@ -34,13 +34,16 @@ class ShipmentServiceImplTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private ShipmentServiceImpl shipmentService;
 
     private Order testOrder;
 
     @BeforeEach
     void setUp() {
-        shipmentService = new ShipmentServiceImpl(shipmentRepository, orderRepository);
+        shipmentService = new ShipmentServiceImpl(shipmentRepository, orderRepository, notificationService);
 
         testOrder = new Order();
         testOrder.setId(100L);

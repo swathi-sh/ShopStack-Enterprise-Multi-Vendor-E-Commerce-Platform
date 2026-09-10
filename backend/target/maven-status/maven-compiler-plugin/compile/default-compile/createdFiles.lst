@@ -53,6 +53,7 @@ com\shopstack\service\CartServiceImpl.class
 com\shopstack\entity\Payment.class
 com\shopstack\controller\OrderController.class
 com\shopstack\service\CouponService.class
+com\shopstack\service\NotificationService.class
 com\shopstack\service\AdminDashboardServiceImpl.class
 com\shopstack\controller\CartController.class
 com\shopstack\dto\WarehouseStaffDTO.class
@@ -126,6 +127,7 @@ com\shopstack\dto\VendorLoginRequest.class
 com\shopstack\dto\CreateShipmentRequest.class
 com\shopstack\entity\DiscountType.class
 com\shopstack\controller\ReturnController.class
+com\shopstack\service\NotificationServiceImpl.class
 com\shopstack\entity\DamageType.class
 com\shopstack\dto\ProductOrderStatsDTO.class
 com\shopstack\dto\ApplyCouponResponse.class

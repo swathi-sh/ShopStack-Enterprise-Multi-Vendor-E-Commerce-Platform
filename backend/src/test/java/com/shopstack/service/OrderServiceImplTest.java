@@ -54,6 +54,8 @@ class OrderServiceImplTest {
     private WarehouseInventoryRepository warehouseInventoryRepository;
     @Mock
     private StockMovementLogRepository stockMovementLogRepository;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private OrderServiceImpl orderService;

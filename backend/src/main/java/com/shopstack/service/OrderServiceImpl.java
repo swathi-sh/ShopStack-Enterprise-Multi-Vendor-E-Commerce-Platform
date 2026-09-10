@@ -34,6 +34,7 @@ public class OrderServiceImpl implements OrderService {
     private final WarehouseOrderAllocationRepository warehouseOrderAllocationRepository;
     private final WarehouseInventoryRepository warehouseInventoryRepository;
     private final StockMovementLogRepository stockMovementLogRepository;
+    private final NotificationService notificationService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
@@ -49,7 +50,8 @@ public class OrderServiceImpl implements OrderService {
                             ShipmentRepository shipmentRepository,
                             WarehouseOrderAllocationRepository warehouseOrderAllocationRepository,
                             WarehouseInventoryRepository warehouseInventoryRepository,
-                            StockMovementLogRepository stockMovementLogRepository) {
+                            StockMovementLogRepository stockMovementLogRepository,
+                            NotificationService notificationService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
@@ -65,6 +67,7 @@ public class OrderServiceImpl implements OrderService {
         this.warehouseOrderAllocationRepository = warehouseOrderAllocationRepository;
         this.warehouseInventoryRepository = warehouseInventoryRepository;
         this.stockMovementLogRepository = stockMovementLogRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -163,6 +166,9 @@ public class OrderServiceImpl implements OrderService {
 
         // Clear cart
         cartItemRepository.deleteByCustomerId(customer.getId());
+
+        // Send Order Placed Notification
+        notificationService.sendOrderPlacedEmail(savedOrder);
 
         return new OrderDTO(savedOrder);
     }

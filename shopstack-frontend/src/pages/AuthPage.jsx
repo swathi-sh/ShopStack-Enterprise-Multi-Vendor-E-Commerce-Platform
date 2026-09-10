@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { loginStart, loginSuccess, loginFailure } from '../store/slices/authSlice';
 import { ShoppingBag, CheckCircle, AlertCircle, Lock, Mail, User, Phone, MapPin } from 'lucide-react';
@@ -23,7 +23,11 @@ const AuthPage = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading, error } = useSelector((state) => state.auth);
+
+  // After login/register, go back to where the user was trying to go (or /products)
+  const redirectTo = location.state?.from?.pathname || '/products';
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -55,7 +59,7 @@ const AuthPage = () => {
         });
 
         dispatch(loginSuccess(response.data));
-        navigate('/products');
+        navigate(redirectTo, { replace: true });
       } catch (err) {
         const errorMessage = getErrorMessage(err, 'Registration failed. Please check your inputs.');
         dispatch(loginFailure(errorMessage));
@@ -71,11 +75,11 @@ const AuthPage = () => {
         dispatch(loginSuccess(response.data));
         const userRole = response.data?.user?.role;
         if (userRole === 'ADMIN') {
-          navigate('/admin/dashboard');
+          navigate('/admin/dashboard', { replace: true });
         } else if (userRole === 'WAREHOUSE_STAFF') {
-          navigate('/warehouse-staff/dashboard');
+          navigate('/warehouse-staff/dashboard', { replace: true });
         } else {
-          navigate('/products');
+          navigate(redirectTo, { replace: true });
         }
       } catch (err) {
         const errorMessage = getErrorMessage(err, 'Sign in failed. Invalid email or password.');
