@@ -12,6 +12,7 @@ import {
   Truck,
   PackageCheck,
   ClipboardList,
+  RotateCcw,
 } from 'lucide-react';
 
 const WarehouseStaffNavbar = () => {
@@ -28,6 +29,7 @@ const WarehouseStaffNavbar = () => {
 
   const navLinks = [
     { name: 'Fulfillment Dashboard', path: '/warehouse-staff/dashboard', icon: LayoutDashboard },
+    { name: 'Returns & QC Intake', path: '/warehouse-staff/qc', icon: RotateCcw },
   ];
 
   const isActive = (path) => location.pathname === path;

@@ -124,13 +124,8 @@ public class ReturnController {
      */
     @PostMapping("/admin/{returnId}/refund")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> initiateRefund(@PathVariable Long returnId) {
-        try {
-            ReturnRequestDTO result = returnService.initiateRefund(returnId);
-            return ResponseEntity.ok(result);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(Map.of("error", e.getMessage()));
-        }
+    public ResponseEntity<ReturnRequestDTO> initiateRefund(@PathVariable Long returnId) {
+        ReturnRequestDTO result = returnService.initiateRefund(returnId);
+        return ResponseEntity.ok(result);
     }
 }

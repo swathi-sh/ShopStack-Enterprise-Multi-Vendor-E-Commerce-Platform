@@ -4,5 +4,6 @@ public enum WarehouseAllocationStatus {
     ALLOCATED,
     PICKED,
     PACKED,
-    READY_FOR_SHIPMENT
+    READY_FOR_SHIPMENT,
+    CANCELLED
 }

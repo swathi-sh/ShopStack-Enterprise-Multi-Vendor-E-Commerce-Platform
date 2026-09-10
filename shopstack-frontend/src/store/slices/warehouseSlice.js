@@ -159,6 +159,18 @@ export const autoAllocateOrder = createAsyncThunk(
   }
 );
 
+export const fetchSuitableWarehousesForOrder = createAsyncThunk(
+  'warehouse/fetchSuitableWarehousesForOrder',
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const response = await axiosClient.get(`/admin/warehouses/suitable-warehouses/${orderId}`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch suitable warehouses');
+    }
+  }
+);
+
 export const fetchStockMovements = createAsyncThunk(
   'warehouse/fetchStockMovements',
   async (_, { rejectWithValue }) => {

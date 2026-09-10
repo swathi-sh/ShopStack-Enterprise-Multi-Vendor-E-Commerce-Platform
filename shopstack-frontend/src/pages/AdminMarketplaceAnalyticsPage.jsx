@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   BarChart3,
   Users,
@@ -42,7 +43,7 @@ const AdminMarketplaceAnalyticsPage = () => {
       setProductStats(prodRes.data);
       setSalesReport(salesRes.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load analytics.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load marketplace analytics.'));
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\ShipmentDTO.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\security\SecurityConfig.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\ComprehensiveReportsDTO.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\DamageResponsibility.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\AdminSystemHealthDTO.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\WarehouseRepository.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\OrderStatus.java
@@ -62,6 +63,7 @@ D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\Wishlis
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\PaymentRepository.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\CategoryServiceImpl.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\Role.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\QCResult.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\CouponRepository.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\ProductReviewRepository.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\WarehouseService.java
@@ -114,6 +116,7 @@ D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\LoginRequest.j
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\VendorPerformanceDTO.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\CustomerServiceImpl.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\CategoryDTO.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\WarehouseQCRequestDto.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\PaymentService.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\DiscountType.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\CreateWarehouseRequest.java
@@ -147,6 +150,7 @@ D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\Custome
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\WarehouseServiceImpl.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\repository\WarehouseOrderAllocationRepository.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\CartController.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\DamageType.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\exception\CustomerAlreadyExistsException.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\RegisterRequest.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\PaymentServiceImpl.java

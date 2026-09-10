@@ -2,6 +2,7 @@ package com.shopstack.service;
 
 import com.shopstack.dto.AddToCartRequest;
 import com.shopstack.dto.CartItemDTO;
+import com.shopstack.entity.ApprovalStatus;
 import com.shopstack.entity.CartItem;
 import com.shopstack.entity.Customer;
 import com.shopstack.entity.Product;
@@ -34,18 +35,36 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public CartItemDTO addToCart(String customerEmail, AddToCartRequest request) {
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than 0.");
+        }
+
         Customer customer = customerRepository.findByEmail(customerEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found for email: " + customerEmail));
 
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + request.getProductId()));
 
+        if (!ApprovalStatus.APPROVED.equals(product.getApprovalStatus())) {
+            throw new IllegalStateException("Product '" + product.getName() + "' is not approved for purchase.");
+        }
+
         Optional<CartItem> existingItem = cartItemRepository.findByCustomerIdAndProductId(customer.getId(), product.getId());
+
+        int targetQuantity = request.getQuantity();
+        if (existingItem.isPresent()) {
+            targetQuantity += existingItem.get().getQuantity();
+        }
+
+        if (product.getStockQuantity() < targetQuantity) {
+            throw new IllegalArgumentException("Cannot add requested quantity to cart. Available stock for '" +
+                    product.getName() + "' is " + product.getStockQuantity() + ", requested total in cart: " + targetQuantity + ".");
+        }
 
         CartItem item;
         if (existingItem.isPresent()) {
             item = existingItem.get();
-            item.setQuantity(item.getQuantity() + request.getQuantity());
+            item.setQuantity(targetQuantity);
         } else {
             item = new CartItem(customer, product, request.getQuantity());
         }
@@ -66,9 +85,15 @@ public class CartServiceImpl implements CartService {
             throw new RuntimeException("Unauthorized cart access");
         }
 
-        if (quantity <= 0) {
+        if (quantity == null || quantity <= 0) {
             cartItemRepository.delete(item);
             return null;
+        }
+
+        Product product = item.getProduct();
+        if (product.getStockQuantity() < quantity) {
+            throw new IllegalArgumentException("Cannot update cart quantity. Available stock for '" +
+                    product.getName() + "' is " + product.getStockQuantity() + ", requested: " + quantity + ".");
         }
 
         item.setQuantity(quantity);

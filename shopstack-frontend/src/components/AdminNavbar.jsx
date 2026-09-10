@@ -66,8 +66,8 @@ const AdminNavbar = () => {
             </Link>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center gap-1">
+          {/* Desktop & Tablet Navigation Links */}
+          <div className="hidden xl:flex items-center gap-1 overflow-x-auto max-w-full py-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const active = isActive(link.path);
@@ -75,13 +75,13 @@ const AdminNavbar = () => {
                 <Link
                   key={link.name}
                   to={link.path}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     active
                       ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${active ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${active ? 'text-amber-400' : 'text-slate-400'}`} />
                   <span>{link.name}</span>
                 </Link>
               );
@@ -89,14 +89,13 @@ const AdminNavbar = () => {
           </div>
 
           {/* User Profile & Logout */}
-          <div className="hidden md:flex items-center gap-4">
-            <div className="flex items-center gap-2.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-              <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xs">
+          <div className="hidden xl:flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+              <div className="w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xs">
                 {user?.name?.charAt(0) || 'A'}
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold text-slate-200 leading-tight">{user?.name || 'Administrator'}</p>
-                <p className="text-[10px] text-slate-400 leading-tight">{user?.email || 'admin@shopstack.com'}</p>
+                <p className="text-xs font-bold text-slate-200 leading-tight">{user?.name || 'Admin'}</p>
               </div>
             </div>
 
@@ -109,8 +108,8 @@ const AdminNavbar = () => {
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden">
+          {/* Mobile & Tablet Menu Toggle Button */}
+          <div className="flex xl:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none"
@@ -121,9 +120,9 @@ const AdminNavbar = () => {
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Mobile & Tablet Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-800 bg-slate-900/95 px-4 pt-3 pb-4 space-y-2">
+        <div className="xl:hidden border-t border-slate-800 bg-slate-900/95 px-4 pt-3 pb-4 space-y-2 max-h-[80vh] overflow-y-auto">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const active = isActive(link.path);

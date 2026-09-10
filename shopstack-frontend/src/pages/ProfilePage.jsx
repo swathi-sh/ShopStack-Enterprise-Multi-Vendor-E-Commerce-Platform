@@ -8,6 +8,7 @@ import {
   resetUpdateSuccess,
 } from '../store/slices/authSlice';
 import { User, Mail, Phone, MapPin, Shield, Edit3, CheckCircle, AlertCircle, RefreshCw, Calendar } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const ProfilePage = () => {
   const dispatch = useDispatch();
@@ -37,7 +38,7 @@ const ProfilePage = () => {
         address: response.data.address || '',
       });
     } catch (err) {
-      setFetchError(err.response?.data?.message || 'Failed to fetch customer profile.');
+      setFetchError(getErrorMessage(err, 'Failed to fetch customer profile.'));
     } finally {
       setFetchingProfile(false);
     }
@@ -71,7 +72,7 @@ const ProfilePage = () => {
         dispatch(resetUpdateSuccess());
       }, 5000);
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to update profile details.';
+      const errorMsg = getErrorMessage(err, 'Failed to update profile details.');
       dispatch(updateProfileFailure(errorMsg));
     }
   };

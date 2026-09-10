@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { setWishlistItems, setWishlistLoading } from '../store/slices/wishlistSlice';
 import { setCartItems } from '../store/slices/cartSlice';
-import { Heart, Trash2, ShoppingCart, ShoppingBag, Store } from 'lucide-react';
+import { Heart, Trash2, ShoppingCart, ShoppingBag, Store, AlertTriangle } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const WishlistPage = () => {
   const dispatch = useDispatch();
@@ -12,14 +13,17 @@ const WishlistPage = () => {
   const { items: wishlistItems, loading } = useSelector((state) => state.wishlist);
 
   const [message, setMessage] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const fetchWishlist = async () => {
     dispatch(setWishlistLoading(true));
+    setErrorMsg('');
     try {
       const res = await axiosClient.get('/wishlist');
       dispatch(setWishlistItems(res.data));
     } catch (err) {
       console.error('Failed to load wishlist', err);
+      setErrorMsg(getErrorMessage(err, 'Failed to load wishlist. Please try refreshing.'));
     } finally {
       dispatch(setWishlistLoading(false));
     }
@@ -34,7 +38,7 @@ const WishlistPage = () => {
       await axiosClient.delete(`/wishlist/${productId}`);
       fetchWishlist();
     } catch (err) {
-      console.error('Failed to remove wishlist item', err);
+      showMessage(getErrorMessage(err, 'Failed to remove wishlist item. Please try again.'));
     }
   };
 
@@ -79,6 +83,14 @@ const WishlistPage = () => {
         {message && (
           <div className="bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 p-4 rounded-2xl text-sm">
             {message}
+          </div>
+        )}
+
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="flex items-center space-x-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 p-4 rounded-2xl text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{errorMsg}</span>
           </div>
         )}
 

@@ -18,8 +18,8 @@ import {
   FileText,
   Loader2,
   ArrowRight,
-  ShieldCheck
 } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const STATUS_OPTIONS = ['ALL', 'PENDING', 'CONFIRMED', 'PROCESSING', 'READY_FOR_SHIPPING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED'];
 

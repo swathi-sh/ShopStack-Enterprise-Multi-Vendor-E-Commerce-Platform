@@ -7,6 +7,7 @@ import {
   ShoppingCart, Trash2, ArrowRight, ShieldCheck, ShoppingBag, Tag,
   AlertTriangle, Package, Zap
 } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const CartPage = () => {
   const dispatch = useDispatch();
@@ -36,14 +37,15 @@ const CartPage = () => {
     if (newQty < 1) return;
     if (maxStock !== undefined && newQty > maxStock) {
       setErrorMsg(`Only ${maxStock} units available in stock.`);
-      setTimeout(() => setErrorMsg(''), 3000);
+      setTimeout(() => setErrorMsg(''), 4000);
       return;
     }
     try {
       await axiosClient.put(`/cart/items/${itemId}`, { quantity: newQty });
       fetchCart();
     } catch (err) {
-      console.error('Failed to update cart quantity', err);
+      setErrorMsg(getErrorMessage(err, 'Failed to update quantity. Please try again.'));
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
@@ -52,7 +54,8 @@ const CartPage = () => {
       await axiosClient.delete(`/cart/items/${itemId}`);
       fetchCart();
     } catch (err) {
-      console.error('Failed to remove cart item', err);
+      setErrorMsg(getErrorMessage(err, 'Failed to remove item. Please try again.'));
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 

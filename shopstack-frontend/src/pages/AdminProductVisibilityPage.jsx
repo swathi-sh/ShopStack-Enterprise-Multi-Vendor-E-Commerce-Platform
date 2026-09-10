@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   Package,
   Search,
@@ -35,7 +36,7 @@ const AdminProductVisibilityPage = () => {
       const res = await axiosClient.get('/admin/products');
       setProducts(res.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load products.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load products.'));
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,8 @@ import axiosClient from '../api/axiosClient';
 import { loginStart, loginSuccess, loginFailure } from '../store/slices/authSlice';
 import { ShoppingBag, CheckCircle, AlertCircle, Lock, Mail, User, Phone, MapPin } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -55,11 +57,7 @@ const AuthPage = () => {
         dispatch(loginSuccess(response.data));
         navigate('/products');
       } catch (err) {
-        const errorMessage =
-          err.response?.data?.message ||
-          (err.response?.data?.errors
-            ? Object.values(err.response.data.errors).join(', ')
-            : 'Registration failed. Please check your credentials.');
+        const errorMessage = getErrorMessage(err, 'Registration failed. Please check your inputs.');
         dispatch(loginFailure(errorMessage));
       }
     } else {
@@ -80,8 +78,7 @@ const AuthPage = () => {
           navigate('/products');
         }
       } catch (err) {
-        const errorMessage =
-          err.response?.data?.message || 'Sign in failed. Invalid email or password.';
+        const errorMessage = getErrorMessage(err, 'Sign in failed. Invalid email or password.');
         dispatch(loginFailure(errorMessage));
       }
     }

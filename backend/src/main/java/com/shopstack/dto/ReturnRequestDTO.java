@@ -1,7 +1,6 @@
 package com.shopstack.dto;
 
-import com.shopstack.entity.ReturnRequest;
-import com.shopstack.entity.ReturnStatus;
+import com.shopstack.entity.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -42,6 +41,22 @@ public class ReturnRequestDTO {
     private String razorpayRefundId;
     private String refundFailureReason;
 
+    // QC & Damage Details
+    private QCResult qcResult;
+    private DamageType damageType;
+    private String damageDescription;
+    private DamageResponsibility damageResponsibility;
+
+    // QC Staff info
+    private Long qcStaffId;
+    private String qcStaffName;
+    private String qcStaffEmail;
+    private LocalDateTime qcDate;
+
+    // Assigned Warehouse info (where return is routed)
+    private Long assignedWarehouseId;
+    private String assignedWarehouseName;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -51,6 +66,11 @@ public class ReturnRequestDTO {
         this.id = r.getId();
         this.orderId = r.getOrder() != null ? r.getOrder().getId() : null;
         this.orderItemId = r.getOrderItem() != null ? r.getOrderItem().getId() : null;
+
+        if (r.getOrder() != null && r.getOrder().getWarehouse() != null) {
+            this.assignedWarehouseId = r.getOrder().getWarehouse().getId();
+            this.assignedWarehouseName = r.getOrder().getWarehouse().getName();
+        }
 
         if (r.getCustomer() != null) {
             this.customerId = r.getCustomer().getId();
@@ -75,6 +95,18 @@ public class ReturnRequestDTO {
         this.returnStatus = r.getReturnStatus();
         this.adminNotes = r.getAdminNotes();
         this.isUsable = r.getIsUsable();
+
+        this.qcResult = r.getQcResult();
+        this.damageType = r.getDamageType();
+        this.damageDescription = r.getDamageDescription();
+        this.damageResponsibility = r.getDamageResponsibility();
+        this.qcDate = r.getQcDate();
+
+        if (r.getQcStaff() != null) {
+            this.qcStaffId = r.getQcStaff().getId();
+            this.qcStaffName = r.getQcStaff().getName();
+            this.qcStaffEmail = r.getQcStaff().getEmail();
+        }
 
         if (r.getRestockWarehouse() != null) {
             this.restockWarehouseId = r.getRestockWarehouse().getId();
@@ -152,6 +184,36 @@ public class ReturnRequestDTO {
 
     public String getRefundFailureReason() { return refundFailureReason; }
     public void setRefundFailureReason(String refundFailureReason) { this.refundFailureReason = refundFailureReason; }
+
+    public QCResult getQcResult() { return qcResult; }
+    public void setQcResult(QCResult qcResult) { this.qcResult = qcResult; }
+
+    public DamageType getDamageType() { return damageType; }
+    public void setDamageType(DamageType damageType) { this.damageType = damageType; }
+
+    public String getDamageDescription() { return damageDescription; }
+    public void setDamageDescription(String damageDescription) { this.damageDescription = damageDescription; }
+
+    public DamageResponsibility getDamageResponsibility() { return damageResponsibility; }
+    public void setDamageResponsibility(DamageResponsibility damageResponsibility) { this.damageResponsibility = damageResponsibility; }
+
+    public Long getQcStaffId() { return qcStaffId; }
+    public void setQcStaffId(Long qcStaffId) { this.qcStaffId = qcStaffId; }
+
+    public String getQcStaffName() { return qcStaffName; }
+    public void setQcStaffName(String qcStaffName) { this.qcStaffName = qcStaffName; }
+
+    public String getQcStaffEmail() { return qcStaffEmail; }
+    public void setQcStaffEmail(String qcStaffEmail) { this.qcStaffEmail = qcStaffEmail; }
+
+    public LocalDateTime getQcDate() { return qcDate; }
+    public void setQcDate(LocalDateTime qcDate) { this.qcDate = qcDate; }
+
+    public Long getAssignedWarehouseId() { return assignedWarehouseId; }
+    public void setAssignedWarehouseId(Long assignedWarehouseId) { this.assignedWarehouseId = assignedWarehouseId; }
+
+    public String getAssignedWarehouseName() { return assignedWarehouseName; }
+    public void setAssignedWarehouseName(String assignedWarehouseName) { this.assignedWarehouseName = assignedWarehouseName; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

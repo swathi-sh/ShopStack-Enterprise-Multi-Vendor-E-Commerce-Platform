@@ -243,9 +243,6 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDTO> getFeaturedProducts() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "rating", "reviewCount"));
         List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
-        if (list.isEmpty()) {
-            list = productRepository.findAll(pageable).getContent();
-        }
         return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
@@ -254,9 +251,6 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDTO> getNewArrivals() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "createdAt"));
         List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
-        if (list.isEmpty()) {
-            list = productRepository.findAll(pageable).getContent();
-        }
         return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
@@ -265,9 +259,6 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDTO> getBestSellers() {
         Pageable pageable = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "reviewCount", "rating"));
         List<Product> list = productRepository.findByApprovalStatus(ApprovalStatus.APPROVED, pageable).getContent();
-        if (list.isEmpty()) {
-            list = productRepository.findAll(pageable).getContent();
-        }
         return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 
@@ -281,9 +272,6 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public List<ProductDTO> getProductsByCategory(Long categoryId) {
         List<Product> list = productRepository.findByApprovalStatusAndCategoryId(ApprovalStatus.APPROVED, categoryId);
-        if (list.isEmpty()) {
-            list = productRepository.filterProducts(null, categoryId, null, null, null);
-        }
         return list.stream().map(ProductDTO::new).collect(Collectors.toList());
     }
 

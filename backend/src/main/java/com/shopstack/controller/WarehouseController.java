@@ -107,6 +107,11 @@ public class WarehouseController {
         return ResponseEntity.ok(warehouseService.autoAllocateOrderIfPossible(orderId));
     }
 
+    @GetMapping("/suitable-warehouses/{orderId}")
+    public ResponseEntity<List<WarehouseDTO>> getSuitableWarehouses(@PathVariable Long orderId) {
+        return ResponseEntity.ok(warehouseService.getSuitableWarehousesForOrder(orderId));
+    }
+
     // ─── Stock Movement Logs & Analytics ──────────────────────────────────────
 
     @GetMapping("/stock-movements")

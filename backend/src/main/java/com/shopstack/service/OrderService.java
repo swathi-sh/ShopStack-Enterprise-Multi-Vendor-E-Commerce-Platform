@@ -12,4 +12,5 @@ public interface OrderService {
     List<OrderDTO> getCustomerOrderHistory(String customerEmail);
     List<OrderItemDTO> getVendorSalesOrders(String vendorEmail);
     OrderDTO updateOrderStatus(Long orderId, OrderStatus status);
+    OrderDTO cancelOrder(Long orderId, String customerEmail);
 }

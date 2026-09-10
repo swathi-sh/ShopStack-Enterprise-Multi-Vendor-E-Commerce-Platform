@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   Percent,
   DollarSign,
@@ -30,7 +31,7 @@ const AdminCommissionsPage = () => {
       const res = await axiosClient.get('/admin/commissions');
       setSummary(res.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load commission data.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load commission data.'));
     } finally {
       setLoading(false);
     }
@@ -44,6 +45,7 @@ const AdminCommissionsPage = () => {
     setEditingVendorId(vendor.vendorId);
     setNewRate(vendor.commissionRate || '10.00');
     setSuccessMsg('');
+    setErrorMsg('');
   };
 
   const handleCancelEdit = () => {
@@ -54,18 +56,20 @@ const AdminCommissionsPage = () => {
   const handleSaveRate = async (vendorId) => {
     const rateNum = Number(newRate);
     if (isNaN(rateNum) || rateNum < 0 || rateNum > 100) {
-      alert('Please enter a valid commission rate percentage between 0 and 100.');
+      setErrorMsg('Please enter a valid commission rate percentage between 0 and 100.');
       return;
     }
 
     setUpdating(true);
+    setErrorMsg('');
+    setSuccessMsg('');
     try {
       await axiosClient.put(`/admin/vendors/${vendorId}/commission-rate?rate=${rateNum}`);
       setSuccessMsg(`Vendor commission rate updated to ${rateNum}% successfully!`);
       setEditingVendorId(null);
       fetchCommissions();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to update vendor commission rate.');
+      setErrorMsg(getErrorMessage(err, 'Failed to update vendor commission rate.'));
     } finally {
       setUpdating(false);
     }

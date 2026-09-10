@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   FileText,
   RefreshCw,
@@ -35,7 +36,7 @@ const AdminBusinessReportsPage = () => {
       const res = await axiosClient.get('/admin/reports/comprehensive');
       setReports(res.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load reports.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load business reports.'));
     } finally {
       setLoading(false);
     }

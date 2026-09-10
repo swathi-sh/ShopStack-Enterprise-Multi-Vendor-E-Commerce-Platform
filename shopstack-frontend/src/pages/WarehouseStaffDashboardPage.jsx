@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useLocation } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import {
   fetchMyStaffProfile,
@@ -18,6 +19,7 @@ import {
   Boxes,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Truck,
   ArrowRight,
   RefreshCw,
@@ -37,8 +39,11 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const WarehouseStaffDashboardPage = () => {
+import { getErrorMessage } from '../api/errorUtils';
+
+const WarehouseStaffDashboardPage = ({ defaultTab }) => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const {
     myStaffProfile,
     inventory,
@@ -50,20 +55,41 @@ const WarehouseStaffDashboardPage = () => {
     successMessage,
   } = useSelector((state) => state.warehouse);
 
-  const [activeTab, setActiveTab] = useState('allocated_orders'); // 'allocated_orders' | 'picking' | 'packing' | 'shipping' | 'returns_qc' | 'movements' | 'inventory'
+  const getInitialTab = () => {
+    if (defaultTab) return defaultTab;
+    if (location?.pathname?.includes('/qc') || location?.pathname?.includes('/returns')) {
+      return 'returns_qc';
+    }
+    return 'allocated_orders';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab); // 'allocated_orders' | 'picking' | 'packing' | 'shipping' | 'returns_qc' | 'movements' | 'inventory'
   const [searchTerm, setSearchTerm] = useState('');
   const [staffReturns, setStaffReturns] = useState([]);
+  const [qcSelectedResult, setQcSelectedResult] = useState({}); // { [retId]: 'PASSED' | 'DAMAGED' | 'FAILED' }
+  const [qcDamageType, setQcDamageType] = useState({}); // { [retId]: 'PHYSICAL' | 'FUNCTIONAL' | 'PACKAGING' | 'WATER_DAMAGE' | 'OTHER' }
+  const [qcDamageResp, setQcDamageResp] = useState({}); // { [retId]: 'CUSTOMER' | 'SELLER' | 'COURIER' | 'UNKNOWN' }
   const [qcNotes, setQcNotes] = useState({});
   const [processingQcId, setProcessingQcId] = useState(null);
   const [qcSuccess, setQcSuccess] = useState('');
   const [qcError, setQcError] = useState('');
 
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    } else if (location?.pathname?.includes('/qc') || location?.pathname?.includes('/returns')) {
+      setActiveTab('returns_qc');
+    }
+  }, [defaultTab, location?.pathname]);
+
   const fetchStaffReturns = async () => {
     try {
       const res = await axiosClient.get('/warehouse-staff/returns');
-      setStaffReturns(res.data);
+      setStaffReturns(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.warn('Could not load staff returns', err);
+      setStaffReturns([]);
+      setQcError(getErrorMessage(err, 'Could not load returns for Quality Control.'));
     }
   };
 
@@ -107,18 +133,33 @@ const WarehouseStaffDashboardPage = () => {
     loadData();
   };
 
-  const handlePerformQC = async (returnId, isUsable) => {
+  const handlePerformQC = async (returnId) => {
+    const result = qcSelectedResult[returnId] || 'PASSED';
+    const dType = qcDamageType[returnId] || 'OTHER';
+    const dResp = qcDamageResp[returnId] || 'UNKNOWN';
+    const notes = qcNotes[returnId] || '';
+
     setProcessingQcId(returnId);
     setQcSuccess('');
     setQcError('');
     try {
-      const notes = qcNotes[returnId] || '';
       await axiosClient.post(`/warehouse-staff/returns/${returnId}/qc`, {
-        isUsable,
-        adminNotes: notes,
-        warehouseId: myStaffProfile?.warehouseId || undefined
+        qcResult: result,
+        damageType: result === 'DAMAGED' ? dType : undefined,
+        damageResponsibility: result === 'DAMAGED' ? dResp : undefined,
+        damageDescription: notes,
       });
-      setQcSuccess(`QC Completed! Item marked ${isUsable ? 'ACCEPTED & RESTOCKED' : 'DAMAGED & QUARANTINED'}.`);
+
+      let statusMsg = 'QC PASSED & Restocked to available inventory';
+      if (result === 'DAMAGED') {
+        statusMsg = dResp === 'CUSTOMER'
+          ? 'QC DAMAGED (Customer Responsible) & Return Rejected'
+          : `QC DAMAGED (${dResp} Responsible) & Quarantined (Refund Accepted)`;
+      } else if (result === 'FAILED') {
+        statusMsg = 'QC FAILED & Return Rejected';
+      }
+
+      setQcSuccess(`QC Processed successfully! ${statusMsg}.`);
       loadData();
     } catch (err) {
       setQcError(err.response?.data?.message || err.response?.data || err.message || 'QC submission failed.');
@@ -132,7 +173,9 @@ const WarehouseStaffDashboardPage = () => {
   const readyForPickAllocations = allocations.filter((a) => a.status === 'ALLOCATED');
   const readyForPackAllocations = allocations.filter((a) => a.status === 'PICKED');
   const readyForShipmentAllocations = allocations.filter((a) => a.status === 'PACKED');
-  const pendingQcReturns = staffReturns.filter((r) => r.returnStatus === 'RETURN_APPROVED');
+  const pendingQcReturns = (staffReturns || []).filter(
+    (r) => r.returnStatus === 'RETURN_APPROVED' || r.returnStatus === 'PRODUCT_RETURNED' || r.returnStatus === 'RETURN_RECEIVED'
+  );
 
   const filteredMovements = stockMovements.filter(
     (m) =>
@@ -687,7 +730,7 @@ const WarehouseStaffDashboardPage = () => {
             ) : (
               <div className="space-y-4">
                 {staffReturns.map((ret) => {
-                  const isPending = ret.returnStatus === 'RETURN_APPROVED';
+                  const isPending = ret.returnStatus === 'RETURN_APPROVED' || ret.returnStatus === 'PRODUCT_RETURNED' || ret.returnStatus === 'RETURN_RECEIVED';
                   const isDone = ret.returnStatus === 'RETURN_ACCEPTED' || ret.returnStatus === 'REFUNDED';
                   return (
                     <div
@@ -729,46 +772,146 @@ const WarehouseStaffDashboardPage = () => {
 
                       {/* QC Action form if pending */}
                       {isPending ? (
-                        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                          <p className="text-xs font-bold text-slate-300">Perform Physical Inspection & QC Decision:</p>
+                        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-4">
+                          <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                            <ShieldCheck className="w-4 h-4 text-orange-400" />
+                            Perform Physical Inspection & QC Decision:
+                          </p>
+
+                          {/* QC Result Selector Buttons */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setQcSelectedResult({ ...qcSelectedResult, [ret.id]: 'PASSED' })}
+                              className={`py-2 px-3 rounded-xl font-extrabold text-xs border transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                (qcSelectedResult[ret.id] || 'PASSED') === 'PASSED'
+                                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> PASSED (Good)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQcSelectedResult({ ...qcSelectedResult, [ret.id]: 'DAMAGED' })}
+                              className={`py-2 px-3 rounded-xl font-extrabold text-xs border transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                qcSelectedResult[ret.id] === 'DAMAGED'
+                                  ? 'bg-amber-600 border-amber-500 text-white shadow-lg'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" /> DAMAGED
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQcSelectedResult({ ...qcSelectedResult, [ret.id]: 'FAILED' })}
+                              className={`py-2 px-3 rounded-xl font-extrabold text-xs border transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                qcSelectedResult[ret.id] === 'FAILED'
+                                  ? 'bg-rose-600 border-rose-500 text-white shadow-lg'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <XCircle className="w-3.5 h-3.5" /> FAILED (Reject)
+                            </button>
+                          </div>
+
+                          {/* Conditional DAMAGED attributes */}
+                          {qcSelectedResult[ret.id] === 'DAMAGED' && (
+                            <div className="bg-amber-950/20 border border-amber-500/20 p-3.5 rounded-xl space-y-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Damage Type</label>
+                                  <select
+                                    value={qcDamageType[ret.id] || 'OTHER'}
+                                    onChange={(e) => setQcDamageType({ ...qcDamageType, [ret.id]: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 cursor-pointer"
+                                  >
+                                    <option value="PHYSICAL">PHYSICAL (Cracked, Scratched, Broken)</option>
+                                    <option value="FUNCTIONAL">FUNCTIONAL (Not turning on / Hardware fault)</option>
+                                    <option value="PACKAGING">PACKAGING (Torn / Tampered box)</option>
+                                    <option value="WATER_DAMAGE">WATER_DAMAGE (Moisture / Liquid stain)</option>
+                                    <option value="OTHER">OTHER (General damage)</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Damage Responsibility</label>
+                                  <select
+                                    value={qcDamageResp[ret.id] || 'UNKNOWN'}
+                                    onChange={(e) => setQcDamageResp({ ...qcDamageResp, [ret.id]: e.target.value })}
+                                    className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 cursor-pointer"
+                                  >
+                                    <option value="SELLER">SELLER (Defective before shipment - Refund Eligible)</option>
+                                    <option value="COURIER">COURIER (Transit damage - Refund Eligible)</option>
+                                    <option value="UNKNOWN">UNKNOWN (Pre-delivery suspected - Refund Eligible)</option>
+                                    <option value="CUSTOMER">CUSTOMER (Customer damage - Refund Rejected)</option>
+                                  </select>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-amber-300/80 italic">
+                                * Product will be moved to Quarantine Damaged Stock. Returns caused by Seller/Courier/Unknown are eligible for refund; Customer damage will reject refund.
+                              </p>
+                            </div>
+                          )}
+
                           <input
                             type="text"
-                            placeholder="Inspection notes (e.g. Package intact, unopened box / Damaged casing)..."
+                            placeholder="QC Inspection Remarks / Damage Notes (e.g., Unopened box / Water stain on rear panel)..."
                             value={qcNotes[ret.id] || ''}
                             onChange={(e) => setQcNotes({ ...qcNotes, [ret.id]: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-orange-500"
                           />
-                          <div className="flex gap-3">
-                            <button
-                              onClick={() => handlePerformQC(ret.id, true)}
-                              disabled={processingQcId === ret.id}
-                              className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                            >
-                              {processingQcId === ret.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                              QC ACCEPTED (GOOD) &rarr; Restock Available Stock
-                            </button>
 
-                            <button
-                              onClick={() => handlePerformQC(ret.id, false)}
-                              disabled={processingQcId === ret.id}
-                              className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                            >
-                              {processingQcId === ret.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                              QC DAMAGED &rarr; Quarantine Stock (Do NOT Restock)
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handlePerformQC(ret.id)}
+                            disabled={processingQcId === ret.id}
+                            className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-500 text-white font-extrabold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          >
+                            {processingQcId === ret.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                            Submit QC Decision & Complete Inspection
+                          </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-xs p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-                          <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                          <span className="text-slate-300">
-                            QC Completed for Return #{ret.id}.
-                            {ret.isUsable === true ? (
-                              <strong className="text-emerald-400 ml-1">Usable Item Restocked to Available Inventory.</strong>
-                            ) : ret.isUsable === false ? (
-                              <strong className="text-rose-400 ml-1">Damaged Item Moved to Quarantine Stock.</strong>
-                            ) : null}
-                          </span>
+                        <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-bold text-slate-200">
+                              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                              QC Inspection Completed
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
+                              ret.qcResult === 'PASSED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                              ret.qcResult === 'DAMAGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                              'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            }`}>
+                              QC RESULT: {ret.qcResult || (ret.isUsable ? 'PASSED' : 'DAMAGED')}
+                            </span>
+                          </div>
+
+                          {ret.qcResult === 'DAMAGED' && (
+                            <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-950 rounded-lg text-[11px]">
+                              <div>
+                                <span className="text-slate-500 block">Damage Type</span>
+                                <span className="font-bold text-amber-400">{ret.damageType || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block">Responsibility</span>
+                                <span className={`font-bold ${ret.damageResponsibility === 'CUSTOMER' ? 'text-rose-400' : 'text-cyan-400'}`}>
+                                  {ret.damageResponsibility || 'UNKNOWN'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {ret.damageDescription && (
+                            <p className="text-slate-300 italic text-[11px]">
+                              Remarks: "{ret.damageDescription}"
+                            </p>
+                          )}
+
+                          <div className="text-[10px] text-slate-500 flex justify-between border-t border-slate-800 pt-2">
+                            <span>QC Inspector: <strong className="text-slate-400">{ret.qcStaffName || ret.qcStaffEmail || 'Warehouse Staff'}</strong></span>
+                            <span>Date: {ret.qcDate ? new Date(ret.qcDate).toLocaleString() : 'N/A'}</span>
+                          </div>
                         </div>
                       )}
                     </div>

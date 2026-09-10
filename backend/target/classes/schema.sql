@@ -10,8 +10,16 @@ ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('PEN
 ALTER TABLE return_requests DROP CONSTRAINT IF EXISTS return_requests_return_status_check;
 ALTER TABLE return_requests ADD CONSTRAINT return_requests_return_status_check CHECK (return_status IN ('RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'PRODUCT_RETURNED', 'RETURN_RECEIVED', 'RETURN_ACCEPTED', 'REFUND_INITIATED', 'REFUNDED', 'REFUND_FAILED'));
 
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS qc_result VARCHAR(50);
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS damage_type VARCHAR(50);
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS damage_description VARCHAR(2000);
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS damage_responsibility VARCHAR(50);
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS qc_staff_id BIGINT;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS qc_date TIMESTAMP;
+
 ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_status_check;
 ALTER TABLE shipments ADD CONSTRAINT shipments_status_check CHECK (status IN ('SHIPMENT_CREATED', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED'));
+
 
 
 

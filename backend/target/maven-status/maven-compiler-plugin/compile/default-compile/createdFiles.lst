@@ -30,6 +30,7 @@ com\shopstack\entity\WarehouseOrderAllocation.class
 com\shopstack\service\WarehouseService.class
 com\shopstack\dto\CreatePaymentOrderRequest.class
 com\shopstack\entity\StockMovementStage.class
+com\shopstack\dto\WarehouseQCRequestDto.class
 com\shopstack\controller\CategoryController.class
 com\shopstack\entity\OrderStatus.class
 com\shopstack\repository\CustomerRepository.class
@@ -80,12 +81,14 @@ com\shopstack\repository\StockMovementLogRepository.class
 com\shopstack\dto\CreateWarehouseStaffRequest.class
 com\shopstack\dto\UpdateProfileRequest.class
 com\shopstack\dto\CommissionSummaryDTO.class
+com\shopstack\entity\DamageResponsibility.class
 com\shopstack\dto\ComprehensiveReportsDTO$OrderReportSummary.class
 com\shopstack\repository\PaymentRepository.class
 com\shopstack\controller\PaymentController.class
 com\shopstack\dto\ShipmentDTO.class
 com\shopstack\entity\WarehouseInventory.class
 com\shopstack\dto\VerifyPaymentRequest.class
+com\shopstack\entity\QCResult.class
 com\shopstack\dto\ProductReviewRequest.class
 com\shopstack\service\PaymentService.class
 com\shopstack\service\CategoryServiceImpl.class
@@ -123,6 +126,7 @@ com\shopstack\dto\VendorLoginRequest.class
 com\shopstack\dto\CreateShipmentRequest.class
 com\shopstack\entity\DiscountType.class
 com\shopstack\controller\ReturnController.class
+com\shopstack\entity\DamageType.class
 com\shopstack\dto\ProductOrderStatsDTO.class
 com\shopstack\dto\ApplyCouponResponse.class
 com\shopstack\entity\OrderItem.class

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import axiosClient from '../api/axiosClient';
-import { setCustomerOrders, setOrderLoading } from '../store/slices/orderSlice';
+import { setCustomerOrders, setOrderLoading, updateCustomerOrder } from '../store/slices/orderSlice';
 import {
   Package, Clock, Truck, CheckCircle2, MapPin, Store,
   RefreshCw, RotateCcw, Banknote, ShieldCheck, CircleDot, CheckCheck,
   X, AlertTriangle, ChevronDown, Loader2
 } from 'lucide-react';
+
+import { getErrorMessage } from '../api/errorUtils';
 
 // Full order status pipeline
 const STATUS_STEPS = [
@@ -163,39 +165,138 @@ const ShipmentTrackingWidget = ({ orderId }) => {
   );
 };
 
-const OrderTimeline = ({ status }) => {
-  if (EXCEPTION_STATUSES[status]) return null;
+const getNormalizedStatusIndex = (status) => {
+  if (!status) return -1;
+  const s = status.toUpperCase();
+  switch (s) {
+    case 'PENDING':
+    case 'ORDERED':
+      return 0;
+    case 'CONFIRMED':
+      return 1;
+    case 'WAREHOUSE_ALLOCATED':
+    case 'PROCESSING':
+    case 'READY_FOR_SHIPPING':
+      return 2;
+    case 'SHIPPED':
+      return 3;
+    case 'DELIVERED':
+      return 4;
+    default:
+      return -1;
+  }
+};
 
-  const currentIdx = STATUS_STEPS.findIndex(s => s.key === status);
+const OrderTimeline = ({ status }) => {
+  if (status === 'CANCELLED') {
+    return (
+      <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+            <CircleDot className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-extrabold text-rose-300 text-sm">Order Status: CANCELLED</h4>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              This order has been cancelled and item stock has been restored to product inventory in PostgreSQL.
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold bg-rose-600/20 text-rose-400 border border-rose-500/40">
+          CANCELLED
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'RETURNED') {
+    return (
+      <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30">
+            <RotateCcw className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-extrabold text-orange-300 text-sm">Order Status: RETURNED</h4>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              This order has been returned.
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold bg-orange-600/20 text-orange-400 border border-orange-500/40">
+          RETURNED
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'REFUNDED') {
+    return (
+      <div className="bg-teal-500/10 border border-teal-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
+            <Banknote className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-extrabold text-teal-300 text-sm">Order Status: REFUNDED</h4>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              Refund has been issued and will be credited within 5-7 business days.
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold bg-teal-600/20 text-teal-400 border border-teal-500/40">
+          REFUNDED
+        </span>
+      </div>
+    );
+  }
+
+  const currentIdx = getNormalizedStatusIndex(status);
 
   return (
     <div className="flex items-center gap-0 overflow-x-auto py-2">
       {STATUS_STEPS.map((step, idx) => {
         const Icon = step.icon;
-        const isDone = idx < currentIdx;
-        const isActive = idx === currentIdx;
+        const isDone = currentIdx >= 0 && idx < currentIdx;
+        const isActive = currentIdx >= 0 && idx === currentIdx;
 
         return (
           <React.Fragment key={step.key}>
             <div className="flex flex-col items-center flex-shrink-0">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-                isDone
-                  ? 'bg-emerald-600 border-emerald-500'
-                  : isActive
-                  ? `${step.bg} border-transparent`
-                  : 'bg-slate-800 border-slate-700'
-              }`}>
-                <Icon className={`w-3.5 h-3.5 ${isDone || isActive ? 'text-white' : 'text-slate-600'}`} />
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
+                  isDone
+                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-950/40'
+                    : isActive
+                    ? `${step.bg} border-white ring-4 ring-indigo-500/40 scale-110 shadow-lg text-white font-black`
+                    : 'bg-slate-800/80 border-slate-700/70 text-slate-500'
+                }`}
+              >
+                {isDone ? (
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                ) : (
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                )}
               </div>
-              <span className={`text-[10px] mt-1 font-semibold whitespace-nowrap ${
-                isDone ? 'text-emerald-400' : isActive ? step.color : 'text-slate-600'
-              }`}>
+              <span
+                className={`text-[11px] mt-1.5 font-semibold whitespace-nowrap ${
+                  isDone
+                    ? 'text-emerald-400 font-bold'
+                    : isActive
+                    ? `${step.color} font-extrabold scale-105`
+                    : 'text-slate-500 font-normal'
+                }`}
+              >
                 {step.label}
               </span>
             </div>
 
             {idx < STATUS_STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-1 min-w-[1.5rem] ${idx < currentIdx ? 'bg-emerald-600' : 'bg-slate-700'}`} />
+              <div
+                className={`flex-1 h-0.5 mx-1.5 min-w-[2rem] transition-colors ${
+                  currentIdx >= 0 && idx < currentIdx ? 'bg-emerald-500' : 'bg-slate-700/60'
+                }`}
+              />
             )}
           </React.Fragment>
         );
@@ -231,16 +332,16 @@ const ReturnModal = ({ item, orderId, onClose, onSuccess }) => {
       onSuccess('Return request submitted successfully! Our team will review it within 1-2 business days.');
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || err.message || 'Failed to submit return request.');
+      setError(getErrorMessage(err, 'Failed to submit return request.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5"
+        className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 my-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -362,6 +463,95 @@ const ReturnModal = ({ item, orderId, onClose, onSuccess }) => {
   );
 };
 
+// ─── Cancel Order Modal ────────────────────────────────────────────────────────
+const CancelOrderModal = ({ order, onClose, onSuccess }) => {
+  const dispatch = useDispatch();
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleConfirmCancel = async () => {
+    setCancelling(true);
+    setError('');
+    try {
+      const res = await axiosClient.post(`/orders/${order.id}/cancel`);
+      if (res.data) {
+        dispatch(updateCustomerOrder(res.data));
+      }
+      onSuccess(`Order #${order.id} has been cancelled successfully! Item stock quantity restored.`);
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to cancel order. Please try again.'));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white">Cancel Order #{order.id}</h2>
+              <p className="text-xs text-slate-400">Confirm order cancellation</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 text-xs text-slate-300">
+          <p className="font-semibold text-slate-200">
+            Are you sure you want to cancel this order?
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-slate-400">
+            <li>Order status will be saved as <strong className="text-rose-400">CANCELLED</strong> in PostgreSQL.</li>
+            <li>Cancelled item quantity will automatically be restored to product stock inventory.</li>
+          </ul>
+          <div className="pt-2 border-t border-slate-800 flex justify-between font-bold text-white">
+            <span>Order Total:</span>
+            <span className="text-indigo-400">₹{Number(order.totalAmount).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl">
+            <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-rose-300">{error}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={cancelling}
+            className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-700 transition cursor-pointer"
+          >
+            Keep Order
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmCancel}
+            disabled={cancelling}
+            className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+            {cancelling ? 'Cancelling...' : 'Yes, Cancel Order'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Item Return Status Badge ──────────────────────────────────────────────────
 const ReturnStatusBadge = ({ returnInfo }) => {
   if (!returnInfo) return null;
@@ -383,15 +573,18 @@ const OrdersPage = () => {
   // Map: orderItemId -> return info (fetched from /returns/my)
   const [returnMap, setReturnMap] = useState({});
   const [returnModal, setReturnModal] = useState(null); // { item, orderId }
+  const [cancelModalOrder, setCancelModalOrder] = useState(null); // order object
   const [successMsg, setSuccessMsg] = useState('');
+  const [fetchError, setFetchError] = useState('');
 
   const fetchOrders = async () => {
     dispatch(setOrderLoading(true));
+    setFetchError('');
     try {
       const res = await axiosClient.get('/orders/history');
       dispatch(setCustomerOrders(res.data));
     } catch (err) {
-      console.error('Failed to load order history', err);
+      setFetchError(getErrorMessage(err, 'Failed to load order history.'));
     } finally {
       dispatch(setOrderLoading(false));
     }
@@ -451,6 +644,14 @@ const OrdersPage = () => {
           </button>
         </div>
 
+        {/* Error Message */}
+        {fetchError && (
+          <div className="flex items-center gap-3 p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl">
+            <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+            <p className="text-sm text-rose-300 font-semibold">{fetchError}</p>
+          </div>
+        )}
+
         {/* Success Message */}
         {successMsg && (
           <div className="flex items-start gap-3 p-4 bg-teal-500/10 border border-teal-500/30 rounded-2xl">
@@ -493,11 +694,22 @@ const OrdersPage = () => {
                       })}
                     </div>
                   </div>
-                  <div className="text-left sm:text-right">
-                    <span className="text-xs text-slate-400 block">Order Total</span>
-                    <span className="text-2xl font-black text-indigo-400">
-                      ₹{Number(order.totalAmount).toFixed(2)}
-                    </span>
+                  <div className="flex items-center gap-4 text-left sm:text-right">
+                    {['PENDING', 'ORDERED', 'CONFIRMED', 'WAREHOUSE_ALLOCATED', 'PROCESSING', 'READY_FOR_SHIPPING'].includes(order.status?.toUpperCase()) && (
+                      <button
+                        onClick={() => setCancelModalOrder(order)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold rounded-xl transition cursor-pointer shadow-sm"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Cancel Order
+                      </button>
+                    )}
+                    <div>
+                      <span className="text-xs text-slate-400 block">Order Total</span>
+                      <span className="text-2xl font-black text-indigo-400">
+                        ₹{Number(order.totalAmount).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -507,13 +719,6 @@ const OrdersPage = () => {
                     Delivery Timeline
                   </h3>
                   <OrderTimeline status={order.status} />
-                  {EXCEPTION_STATUSES[order.status] && (
-                    <div className={`mt-2 p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${EXCEPTION_STATUSES[order.status].bg} ${EXCEPTION_STATUSES[order.status].color}`}>
-                      {React.createElement(EXCEPTION_STATUSES[order.status].icon, { className: 'w-4 h-4' })}
-                      This order has been {order.status.toLowerCase()}.
-                      {order.status === 'REFUNDED' && ' Refund will be credited within 5-7 business days.'}
-                    </div>
-                  )}
                 </div>
 
                 {/* Live Shipment & Carrier Tracking */}
@@ -623,6 +828,15 @@ const OrdersPage = () => {
           item={returnModal.item}
           orderId={returnModal.orderId}
           onClose={() => setReturnModal(null)}
+          onSuccess={handleReturnSuccess}
+        />
+      )}
+
+      {/* Cancel Order Modal */}
+      {cancelModalOrder && (
+        <CancelOrderModal
+          order={cancelModalOrder}
+          onClose={() => setCancelModalOrder(null)}
           onSuccess={handleReturnSuccess}
         />
       )}

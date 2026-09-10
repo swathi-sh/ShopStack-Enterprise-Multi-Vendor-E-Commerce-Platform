@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import { setCartItems } from '../store/slices/cartSlice';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
-import { Star, ShoppingCart, Heart, ArrowLeft, Tag, Store, ShieldCheck, CheckCircle2, MessageSquare, Send } from 'lucide-react';
+import { Star, ShoppingCart, Heart, ArrowLeft, Tag, Store, ShieldCheck, CheckCircle2, MessageSquare, Send, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -18,6 +19,7 @@ const ProductDetailPage = () => {
   const [selectedImage, setSelectedImage] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
   // Review Form
   const [newRating, setNewRating] = useState(5);
@@ -28,6 +30,7 @@ const ProductDetailPage = () => {
 
   const fetchProductDetails = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const res = await axiosClient.get(`/products/${id}`);
       setProduct(res.data);
@@ -40,7 +43,7 @@ const ProductDetailPage = () => {
       const revRes = await axiosClient.get(`/products/${id}/reviews`);
       setReviews(revRes.data);
     } catch (err) {
-      console.error('Failed to fetch product details', err);
+      setFetchError(getErrorMessage(err, 'Failed to fetch product details.'));
     } finally {
       setLoading(false);
     }
@@ -61,7 +64,7 @@ const ProductDetailPage = () => {
       dispatch(setCartItems(cartRes.data));
       showMessage('Added to cart successfully!');
     } catch (err) {
-      showMessage('Please sign in to add products to your cart.');
+      showMessage(getErrorMessage(err, 'Failed to add item to cart.'));
     }
   };
 
@@ -76,7 +79,7 @@ const ProductDetailPage = () => {
       dispatch(setWishlistItems(wishRes.data));
       showMessage('Product saved to wishlist!');
     } catch (err) {
-      showMessage('Please sign in to manage wishlist.');
+      showMessage(getErrorMessage(err, 'Failed to save to wishlist.'));
     }
   };
 
@@ -97,7 +100,7 @@ const ProductDetailPage = () => {
       showMessage('Thank you! Review submitted successfully.');
       fetchProductDetails();
     } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to submit product review.');
+      showMessage(getErrorMessage(err, 'Failed to submit product review.'));
     } finally {
       setReviewSubmitting(false);
     }
@@ -119,13 +122,22 @@ const ProductDetailPage = () => {
     );
   }
 
-  if (!product) {
+  if (fetchError || !product) {
     return (
-      <div className="min-h-screen bg-slate-950 p-8 text-center text-slate-300">
-        <h2 className="text-xl font-bold text-white">Product not found</h2>
-        <button onClick={() => navigate('/products')} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl">
-          Return to Catalog
-        </button>
+      <div className="min-h-screen bg-slate-950 p-6 flex items-center justify-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center max-w-md space-y-4 shadow-xl">
+          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
+          <h2 className="text-xl font-bold text-white">{fetchError || 'Product Not Found'}</h2>
+          <p className="text-xs text-slate-400">The requested product could not be loaded or is no longer available.</p>
+          <div className="flex gap-3 justify-center pt-2">
+            <button onClick={fetchProductDetails} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer">
+              <RefreshCw className="w-3.5 h-3.5" /> Retry
+            </button>
+            <button onClick={() => navigate('/products')} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs cursor-pointer">
+              Return to Catalog
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

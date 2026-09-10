@@ -243,102 +243,12 @@ public class ReturnServiceImpl implements ReturnService {
         return new ReturnRequestDTO(returnRequestRepository.save(r));
     }
 
-    // ─── Admin: Mark Product Received + Inventory Decision ────────────────
+    // ─── Admin: Mark Product Received + Inventory Decision (Restricted) ───
 
     @Override
     @Transactional
     public ReturnRequestDTO receiveReturn(Long returnId, AdminReceiveReturnRequest request) {
-        ReturnRequest r = returnRequestRepository.findById(returnId)
-                .orElseThrow(() -> new ResourceNotFoundException("Return request not found with ID: " + returnId));
-
-        if (!ReturnStatus.RETURN_APPROVED.equals(r.getReturnStatus())) {
-            throw new IllegalStateException(
-                "Only RETURN_APPROVED returns can be received. Current status: " + r.getReturnStatus());
-        }
-
-        r.setReturnStatus(ReturnStatus.RETURN_RECEIVED);
-        r.setIsUsable(request.getIsUsable());
-
-        if (request.getAdminNotes() != null) {
-            r.setAdminNotes(request.getAdminNotes());
-        }
-
-        Order order = r.getOrder();
-        Product product = r.getOrderItem().getProduct();
-        int returnQty = r.getQuantity();
-
-        if (Boolean.TRUE.equals(request.getIsUsable())) {
-            // Usable: restock into specified warehouse
-            if (request.getWarehouseId() == null) {
-                throw new IllegalArgumentException("warehouseId is required when isUsable is true.");
-            }
-
-            Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found with ID: " + request.getWarehouseId()));
-
-            if (WarehouseStatus.INACTIVE.equals(warehouse.getStatus())) {
-                throw new IllegalStateException("Cannot restock into an INACTIVE warehouse: " + warehouse.getName());
-            }
-
-            r.setRestockWarehouse(warehouse);
-
-            // Update warehouse inventory
-            WarehouseInventory inventory = warehouseInventoryRepository
-                    .findByWarehouseIdAndProductId(warehouse.getId(), product.getId())
-                    .orElseGet(() -> new WarehouseInventory(warehouse, product, 0, 0));
-
-            inventory.setAvailableQuantity(inventory.getAvailableQuantity() + returnQty);
-            warehouseInventoryRepository.save(inventory);
-
-            // Sync global product stock
-            int totalAvail = warehouseInventoryRepository.findByProductId(product.getId())
-                    .stream().mapToInt(WarehouseInventory::getAvailableQuantity).sum();
-            product.setStockQuantity(totalAvail);
-            productRepository.save(product);
-
-            // Record inventory history
-            InventoryHistory history = new InventoryHistory(product, returnQty, totalAvail, "RETURN_RESTOCK");
-            inventoryHistoryRepository.save(history);
-
-            // Record stock movement log
-            StockMovementLog log = new StockMovementLog(
-                    product, warehouse, order,
-                    "RETURNED_USABLE", "AVAILABLE",
-                    StockMovementStage.RETURNED_USABLE,
-                    returnQty,
-                    "Returned usable product restocked for Return #" + returnId + " (Order #" + order.getId() + ")");
-            stockMovementLogRepository.save(log);
-
-            logger.info("Return #{}: {} units of product #{} restocked into warehouse #{}", returnId, returnQty, product.getId(), warehouse.getId());
-
-        } else {
-            // Damaged / Quarantine stock: update warehouse damaged quantity and log
-            Warehouse targetWarehouse = request.getWarehouseId() != null
-                    ? warehouseRepository.findById(request.getWarehouseId()).orElse(null)
-                    : order.getWarehouse();
-
-            if (targetWarehouse != null) {
-                final Warehouse wh = targetWarehouse;
-                r.setRestockWarehouse(wh);
-                WarehouseInventory inventory = warehouseInventoryRepository
-                        .findByWarehouseIdAndProductId(wh.getId(), product.getId())
-                        .orElseGet(() -> new WarehouseInventory(wh, product, 0, 0));
-                inventory.setDamagedQuantity(inventory.getDamagedQuantity() + returnQty);
-                warehouseInventoryRepository.save(inventory);
-
-                StockMovementLog log = new StockMovementLog(
-                        product, wh, order,
-                        "RETURNED_DAMAGED", "DAMAGED_QUARANTINE",
-                        StockMovementStage.RETURNED_DAMAGED,
-                        returnQty,
-                        "Returned damaged product quarantined for Return #" + returnId + " (Order #" + order.getId() + ")");
-                stockMovementLogRepository.save(log);
-            }
-            logger.info("Return #{}: {} units of product #{} marked DAMAGED/QUARANTINE. Added to damaged stock.", returnId, returnQty, product.getId());
-        }
-
-        r.setReturnStatus(ReturnStatus.RETURN_ACCEPTED);
-        return new ReturnRequestDTO(returnRequestRepository.save(r));
+        throw new IllegalStateException("Admin is not permitted to perform Quality Control (QC). Quality Control must be executed by assigned Warehouse Staff upon product intake.");
     }
 
     protected RazorpayClient createRazorpayClient() throws RazorpayException {

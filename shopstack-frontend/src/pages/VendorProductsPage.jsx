@@ -5,6 +5,8 @@ import {
   RefreshCw, X, ShieldCheck, History, Percent, Zap
 } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 const VendorProductsPage = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -105,10 +107,7 @@ const VendorProductsPage = () => {
       showMessage('Product successfully created & added to inventory!');
       fetchVendorProducts();
     } catch (err) {
-      const msg = err.response?.data?.message
-        || (err.response?.data?.errors ? Object.values(err.response.data.errors).join(', ') : null)
-        || 'Failed to create product. Please check all fields.';
-      showMessage(msg, 'error');
+      showMessage(getErrorMessage(err, 'Failed to create product. Please check all fields.'), 'error');
     }
   };
 
@@ -119,7 +118,7 @@ const VendorProductsPage = () => {
       showMessage('Product price updated!');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to update price.', 'error');
+      showMessage(getErrorMessage(err, 'Failed to update price.'), 'error');
     }
   };
 
@@ -130,7 +129,7 @@ const VendorProductsPage = () => {
       showMessage('Inventory stock updated!');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to update stock quantity.', 'error');
+      showMessage(getErrorMessage(err, 'Failed to update stock quantity.'), 'error');
     }
   };
 
@@ -142,7 +141,7 @@ const VendorProductsPage = () => {
       showMessage(discount > 0 ? `${discount}% discount applied!` : 'Discount removed.');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to update discount.', 'error');
+      showMessage(getErrorMessage(err, 'Failed to update discount.'), 'error');
     }
   };
 
@@ -153,7 +152,7 @@ const VendorProductsPage = () => {
       showMessage('Product removed from inventory.');
       fetchVendorProducts();
     } catch (err) {
-      showMessage('Failed to delete product.', 'error');
+      showMessage(getErrorMessage(err, 'Failed to delete product.'), 'error');
     }
   };
 

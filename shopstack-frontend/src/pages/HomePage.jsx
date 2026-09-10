@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   fetchCategories,
   fetchFeaturedProducts,
@@ -172,11 +173,8 @@ const HomePage = () => {
 
       dispatch(setCartItems(cartRes.data));
 
-      showToast('Product added to cart successfully!');
     } catch (err) {
-      console.error('Add to cart error:', err);
-
-      showToast('Please sign in as a customer to add items to cart.');
+      showToast(getErrorMessage(err, 'Failed to add item to cart.'));
     }
   };
 
@@ -195,9 +193,7 @@ const HomePage = () => {
 
       showToast('Saved to your wishlist!');
     } catch (err) {
-      console.error('Wishlist error:', err);
-
-      showToast('Please sign in to manage wishlist.');
+      showToast(getErrorMessage(err, 'Failed to save to wishlist.'));
     }
   };
 

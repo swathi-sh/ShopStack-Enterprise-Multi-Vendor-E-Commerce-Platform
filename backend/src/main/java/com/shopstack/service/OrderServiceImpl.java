@@ -31,6 +31,9 @@ public class OrderServiceImpl implements OrderService {
     private final CouponUsageRepository couponUsageRepository;
     private final WarehouseService warehouseService;
     private final ShipmentRepository shipmentRepository;
+    private final WarehouseOrderAllocationRepository warehouseOrderAllocationRepository;
+    private final WarehouseInventoryRepository warehouseInventoryRepository;
+    private final StockMovementLogRepository stockMovementLogRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
@@ -43,7 +46,10 @@ public class OrderServiceImpl implements OrderService {
                             CouponRepository couponRepository,
                             CouponUsageRepository couponUsageRepository,
                             WarehouseService warehouseService,
-                            ShipmentRepository shipmentRepository) {
+                            ShipmentRepository shipmentRepository,
+                            WarehouseOrderAllocationRepository warehouseOrderAllocationRepository,
+                            WarehouseInventoryRepository warehouseInventoryRepository,
+                            StockMovementLogRepository stockMovementLogRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
@@ -56,6 +62,9 @@ public class OrderServiceImpl implements OrderService {
         this.couponUsageRepository = couponUsageRepository;
         this.warehouseService = warehouseService;
         this.shipmentRepository = shipmentRepository;
+        this.warehouseOrderAllocationRepository = warehouseOrderAllocationRepository;
+        this.warehouseInventoryRepository = warehouseInventoryRepository;
+        this.stockMovementLogRepository = stockMovementLogRepository;
     }
 
     @Override
@@ -138,11 +147,8 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Attempt auto-allocation from active warehouses if stock exists
-        try {
-            warehouseService.autoAllocateOrderIfPossible(savedOrder.getId());
-        } catch (Exception ignored) {
-        }
+        // NOTE: Warehouse allocation is NOT done automatically.
+        // Confirmed orders will appear in the Admin Warehouse Portal for manual or admin-triggered allocation.
 
         // Record Coupon Usage if coupon was applied
         if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
@@ -189,6 +195,10 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
 
+        if (OrderStatus.CANCELLED.equals(status)) {
+            return cancelOrderInternal(order);
+        }
+
         if (OrderStatus.DELIVERED.equals(status)) {
             shipmentRepository.findByOrderId(order.getId()).ifPresentOrElse(
                 shipment -> {
@@ -203,6 +213,92 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(status);
+        return new OrderDTO(orderRepository.save(order));
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO cancelOrder(Long orderId, String customerEmail) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+
+        if (!order.getCustomer().getEmail().equalsIgnoreCase(customerEmail)) {
+            throw new IllegalStateException("Access denied: Order #" + orderId + " does not belong to you.");
+        }
+
+        if (OrderStatus.CANCELLED.equals(order.getStatus())) {
+            return new OrderDTO(order);
+        }
+
+        if (OrderStatus.SHIPPED.equals(order.getStatus()) ||
+            OrderStatus.DELIVERED.equals(order.getStatus()) ||
+            OrderStatus.RETURNED.equals(order.getStatus()) ||
+            OrderStatus.REFUNDED.equals(order.getStatus())) {
+            throw new IllegalStateException("Order #" + orderId + " cannot be cancelled because it is in " + order.getStatus() + " status.");
+        }
+
+        return cancelOrderInternal(order);
+    }
+
+    private OrderDTO cancelOrderInternal(Order order) {
+        if (OrderStatus.CANCELLED.equals(order.getStatus())) {
+            return new OrderDTO(order);
+        }
+
+        // 1. Restore Product Stock & Inventory History
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            int restoredStock = product.getStockQuantity() + item.getQuantity();
+            product.setStockQuantity(restoredStock);
+            productRepository.save(product);
+
+            InventoryHistory history = new InventoryHistory(
+                    product,
+                    item.getQuantity(),
+                    restoredStock,
+                    "ORDER_CANCELLED"
+            );
+            inventoryHistoryRepository.save(history);
+        }
+
+        // 2. Release & Restore Warehouse Inventory allocations if any exist
+        List<WarehouseOrderAllocation> allocations = warehouseOrderAllocationRepository.findByOrderId(order.getId());
+        for (WarehouseOrderAllocation alloc : allocations) {
+            if (!WarehouseAllocationStatus.CANCELLED.equals(alloc.getStatus())) {
+                WarehouseInventory inventory = warehouseInventoryRepository
+                        .findByWarehouseIdAndProductId(alloc.getWarehouse().getId(), alloc.getProduct().getId())
+                        .orElse(null);
+
+                if (inventory != null) {
+                    int allocQty = alloc.getAllocatedQuantity();
+                    int newAllocated = Math.max(0, inventory.getAllocatedQuantity() - allocQty);
+                    int newAvailable = inventory.getAvailableQuantity() + allocQty;
+
+                    inventory.setAllocatedQuantity(newAllocated);
+                    inventory.setAvailableQuantity(newAvailable);
+                    warehouseInventoryRepository.save(inventory);
+
+                    // Sync product stock to total available
+                    int totalAvail = warehouseInventoryRepository.findByProductId(alloc.getProduct().getId())
+                            .stream().mapToInt(WarehouseInventory::getAvailableQuantity).sum();
+                    alloc.getProduct().setStockQuantity(totalAvail);
+                    productRepository.save(alloc.getProduct());
+
+                    StockMovementLog log = new StockMovementLog(
+                            alloc.getProduct(), alloc.getWarehouse(), order,
+                            "ALLOCATED", "AVAILABLE",
+                            StockMovementStage.AVAILABLE,
+                            allocQty,
+                            "Released allocated stock due to Order #" + order.getId() + " cancellation");
+                    stockMovementLogRepository.save(log);
+                }
+
+                alloc.setStatus(WarehouseAllocationStatus.CANCELLED);
+                warehouseOrderAllocationRepository.save(alloc);
+            }
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
         return new OrderDTO(orderRepository.save(order));
     }
 }

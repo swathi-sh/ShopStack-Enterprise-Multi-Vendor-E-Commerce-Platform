@@ -58,6 +58,28 @@ public class ReturnRequest {
     @Column(name = "refund_failure_reason", length = 1000)
     private String refundFailureReason;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "qc_result")
+    private QCResult qcResult;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "damage_type")
+    private DamageType damageType;
+
+    @Column(name = "damage_description", length = 2000)
+    private String damageDescription;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "damage_responsibility")
+    private DamageResponsibility damageResponsibility;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "qc_staff_id")
+    private Customer qcStaff;
+
+    @Column(name = "qc_date")
+    private LocalDateTime qcDate;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -118,6 +140,24 @@ public class ReturnRequest {
 
     public String getRefundFailureReason() { return refundFailureReason; }
     public void setRefundFailureReason(String refundFailureReason) { this.refundFailureReason = refundFailureReason; }
+
+    public QCResult getQcResult() { return qcResult; }
+    public void setQcResult(QCResult qcResult) { this.qcResult = qcResult; }
+
+    public DamageType getDamageType() { return damageType; }
+    public void setDamageType(DamageType damageType) { this.damageType = damageType; }
+
+    public String getDamageDescription() { return damageDescription; }
+    public void setDamageDescription(String damageDescription) { this.damageDescription = damageDescription; }
+
+    public DamageResponsibility getDamageResponsibility() { return damageResponsibility; }
+    public void setDamageResponsibility(DamageResponsibility damageResponsibility) { this.damageResponsibility = damageResponsibility; }
+
+    public Customer getQcStaff() { return qcStaff; }
+    public void setQcStaff(Customer qcStaff) { this.qcStaff = qcStaff; }
+
+    public LocalDateTime getQcDate() { return qcDate; }
+    public void setQcDate(LocalDateTime qcDate) { this.qcDate = qcDate; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

@@ -5,6 +5,8 @@ import axiosClient from '../api/axiosClient';
 import { loginStart, loginSuccess, loginFailure } from '../store/slices/authSlice';
 import { ShieldCheck, Lock, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 const AdminAuthPage = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -44,8 +46,7 @@ const AdminAuthPage = () => {
         setAdminError('Admin access required. Customer and Vendor accounts cannot access the Admin Portal.');
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.message || 'Admin authentication failed. Invalid email or password.';
+      const errorMessage = getErrorMessage(err, 'Admin authentication failed. Invalid email or password.');
       dispatch(loginFailure(errorMessage));
       setAdminError(errorMessage);
     }

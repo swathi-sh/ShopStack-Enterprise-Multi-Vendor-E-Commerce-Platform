@@ -35,6 +35,16 @@ class WarehouseServiceImplTest {
     private OrderRepository orderRepository;
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private CustomerRepository customerRepository;
+    @Mock
+    private ReturnRequestRepository returnRequestRepository;
+    @Mock
+    private ReturnService returnService;
+    @Mock
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    @Mock
+    private InventoryHistoryRepository inventoryHistoryRepository;
 
     @InjectMocks
     private WarehouseServiceImpl warehouseService;
@@ -182,5 +192,126 @@ class WarehouseServiceImplTest {
         assertEquals(0, inventory.getAllocatedQuantity());
         verify(stockMovementLogRepository, times(1)).save(argThat(log -> log.getStage() == StockMovementStage.READY_FOR_SHIPMENT));
         verify(orderRepository, times(1)).save(argThat(o -> o.getStatus() == OrderStatus.READY_FOR_SHIPPING));
+    }
+
+    @Test
+    @DisplayName("processStaffQC PASSED - Restocks available inventory and accepts return")
+    void testProcessStaffQCPassed() {
+        Customer staff = new Customer();
+        staff.setId(20L);
+        staff.setEmail("staff@shopstack.com");
+        staff.setRole(Role.WAREHOUSE_STAFF);
+        staff.setWarehouse(mainWarehouse);
+
+        order.setWarehouse(mainWarehouse);
+        ReturnRequest ret = new ReturnRequest();
+        ret.setId(801L);
+        ret.setOrder(order);
+        ret.setOrderItem(orderItem);
+        ret.setQuantity(2);
+        ret.setReturnStatus(ReturnStatus.RETURN_APPROVED);
+
+        WarehouseInventory inventory = new WarehouseInventory(mainWarehouse, product, 10, 0);
+
+        when(customerRepository.findByEmail("staff@shopstack.com")).thenReturn(Optional.of(staff));
+        when(returnRequestRepository.findById(801L)).thenReturn(Optional.of(ret));
+        when(warehouseInventoryRepository.findByWarehouseIdAndProductId(1L, 101L)).thenReturn(Optional.of(inventory));
+        when(warehouseInventoryRepository.findByProductId(101L)).thenReturn(List.of(inventory));
+        when(returnRequestRepository.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WarehouseQCRequestDto qcDto = new WarehouseQCRequestDto(QCResult.PASSED, null, "Item clean and functional", null);
+
+        ReturnRequestDTO dto = warehouseService.processStaffQC(801L, "staff@shopstack.com", qcDto);
+
+        assertNotNull(dto);
+        assertEquals(ReturnStatus.RETURN_ACCEPTED, dto.getReturnStatus());
+        assertEquals(QCResult.PASSED, dto.getQcResult());
+        assertEquals(12, inventory.getAvailableQuantity());
+    }
+
+    @Test
+    @DisplayName("processStaffQC DAMAGED (SELLER) - Increments damaged stock and accepts return for refund")
+    void testProcessStaffQCDamagedSeller() {
+        Customer staff = new Customer();
+        staff.setId(20L);
+        staff.setEmail("staff@shopstack.com");
+        staff.setRole(Role.WAREHOUSE_STAFF);
+        staff.setWarehouse(mainWarehouse);
+
+        order.setWarehouse(mainWarehouse);
+        ReturnRequest ret = new ReturnRequest();
+        ret.setId(802L);
+        ret.setOrder(order);
+        ret.setOrderItem(orderItem);
+        ret.setQuantity(2);
+        ret.setReturnStatus(ReturnStatus.RETURN_APPROVED);
+
+        WarehouseInventory inventory = new WarehouseInventory(mainWarehouse, product, 10, 0);
+
+        when(customerRepository.findByEmail("staff@shopstack.com")).thenReturn(Optional.of(staff));
+        when(returnRequestRepository.findById(802L)).thenReturn(Optional.of(ret));
+        when(warehouseInventoryRepository.findByWarehouseIdAndProductId(1L, 101L)).thenReturn(Optional.of(inventory));
+        when(returnRequestRepository.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WarehouseQCRequestDto qcDto = new WarehouseQCRequestDto(QCResult.DAMAGED, DamageType.PHYSICAL, "Factory defect", DamageResponsibility.SELLER);
+
+        ReturnRequestDTO dto = warehouseService.processStaffQC(802L, "staff@shopstack.com", qcDto);
+
+        assertNotNull(dto);
+        assertEquals(ReturnStatus.RETURN_ACCEPTED, dto.getReturnStatus());
+        assertEquals(QCResult.DAMAGED, dto.getQcResult());
+        assertEquals(DamageResponsibility.SELLER, dto.getDamageResponsibility());
+        assertEquals(2, inventory.getDamagedQuantity());
+    }
+
+    @Test
+    @DisplayName("processStaffQC DAMAGED (CUSTOMER) - Increments damaged stock and REJECTS return per policy")
+    void testProcessStaffQCDamagedCustomer() {
+        Customer staff = new Customer();
+        staff.setId(20L);
+        staff.setEmail("staff@shopstack.com");
+        staff.setRole(Role.WAREHOUSE_STAFF);
+        staff.setWarehouse(mainWarehouse);
+
+        order.setWarehouse(mainWarehouse);
+        ReturnRequest ret = new ReturnRequest();
+        ret.setId(803L);
+        ret.setOrder(order);
+        ret.setOrderItem(orderItem);
+        ret.setQuantity(1);
+        ret.setReturnStatus(ReturnStatus.RETURN_APPROVED);
+
+        WarehouseInventory inventory = new WarehouseInventory(mainWarehouse, product, 10, 0);
+
+        when(customerRepository.findByEmail("staff@shopstack.com")).thenReturn(Optional.of(staff));
+        when(returnRequestRepository.findById(803L)).thenReturn(Optional.of(ret));
+        when(warehouseInventoryRepository.findByWarehouseIdAndProductId(1L, 101L)).thenReturn(Optional.of(inventory));
+        when(returnRequestRepository.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WarehouseQCRequestDto qcDto = new WarehouseQCRequestDto(QCResult.DAMAGED, DamageType.WATER_DAMAGE, "Customer spilled coffee", DamageResponsibility.CUSTOMER);
+
+        ReturnRequestDTO dto = warehouseService.processStaffQC(803L, "staff@shopstack.com", qcDto);
+
+        assertNotNull(dto);
+        assertEquals(ReturnStatus.RETURN_REJECTED, dto.getReturnStatus());
+        assertEquals(DamageResponsibility.CUSTOMER, dto.getDamageResponsibility());
+        assertEquals(1, inventory.getDamagedQuantity());
+    }
+
+    @Test
+    @DisplayName("processStaffQC Admin role blocked from executing QC")
+    void testProcessStaffQCAdminBlocked() {
+        Customer admin = new Customer();
+        admin.setId(5L);
+        admin.setEmail("admin@shopstack.com");
+        admin.setRole(Role.ADMIN);
+
+        when(customerRepository.findByEmail("admin@shopstack.com")).thenReturn(Optional.of(admin));
+
+        WarehouseQCRequestDto qcDto = new WarehouseQCRequestDto(QCResult.PASSED, null, null, null);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> warehouseService.processStaffQC(801L, "admin@shopstack.com", qcDto));
+        assertTrue(ex.getMessage().contains("Admin is not permitted to perform Quality Control"));
     }
 }

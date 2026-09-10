@@ -5,6 +5,8 @@ import axiosClient from '../api/axiosClient';
 import { vendorLoginStart, vendorLoginSuccess, vendorLoginFailure } from '../store/slices/vendorAuthSlice';
 import { Store, CheckCircle, AlertCircle, Lock, Mail, Phone, MapPin, Building } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 const VendorAuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -53,7 +55,7 @@ const VendorAuthPage = () => {
         dispatch(vendorLoginSuccess(response.data));
         navigate('/vendor/dashboard');
       } catch (err) {
-        const errorMessage = err.response?.data?.message || 'Vendor registration failed. Check connection or parameters.';
+        const errorMessage = getErrorMessage(err, 'Vendor registration failed. Please check parameters.');
         dispatch(vendorLoginFailure(errorMessage));
       }
     } else {
@@ -67,7 +69,7 @@ const VendorAuthPage = () => {
         dispatch(vendorLoginSuccess(response.data));
         navigate('/vendor/dashboard');
       } catch (err) {
-        const errorMessage = err.response?.data?.message || 'Vendor sign in failed. Invalid email or password.';
+        const errorMessage = getErrorMessage(err, 'Vendor sign in failed. Invalid email or password.');
         dispatch(vendorLoginFailure(errorMessage));
       }
     }

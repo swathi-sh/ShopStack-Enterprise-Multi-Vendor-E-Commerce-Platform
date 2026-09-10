@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const AdminCouponsPage = () => {
   const [coupons, setCoupons] = useState([]);
@@ -54,7 +55,7 @@ const AdminCouponsPage = () => {
       setCoupons(couponsRes.data);
       setAnalytics(analyticsRes.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load coupon data.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load coupon data.'));
     } finally {
       setLoading(false);
     }
@@ -136,7 +137,7 @@ const AdminCouponsPage = () => {
       setShowModal(false);
       fetchCouponsAndAnalytics();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to save coupon.');
+      alert(getErrorMessage(err, 'Failed to save coupon.'));
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +148,7 @@ const AdminCouponsPage = () => {
       await axiosClient.patch(`/admin/coupons/${id}/toggle`);
       fetchCouponsAndAnalytics();
     } catch (err) {
-      alert('Failed to toggle coupon status.');
+      alert(getErrorMessage(err, 'Failed to toggle coupon status.'));
     }
   };
 
@@ -157,7 +158,7 @@ const AdminCouponsPage = () => {
       await axiosClient.delete(`/admin/coupons/${id}`);
       fetchCouponsAndAnalytics();
     } catch (err) {
-      alert('Failed to delete coupon.');
+      alert(getErrorMessage(err, 'Failed to delete coupon.'));
     }
   };
 

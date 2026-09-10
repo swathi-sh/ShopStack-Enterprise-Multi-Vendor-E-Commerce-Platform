@@ -285,11 +285,8 @@ public class PaymentServiceImpl implements PaymentService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Attempt auto-allocation from active warehouses if stock exists
-        try {
-            warehouseService.autoAllocateOrderIfPossible(savedOrder.getId());
-        } catch (Exception ignored) {
-        }
+        // NOTE: Warehouse allocation is NOT done automatically.
+        // Confirmed orders will appear in the Admin Warehouse Portal for manual or admin-triggered allocation.
 
         // Record Coupon Usage
         if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {

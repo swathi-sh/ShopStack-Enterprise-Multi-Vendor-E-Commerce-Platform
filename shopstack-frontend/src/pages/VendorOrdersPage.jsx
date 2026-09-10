@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 import {
   ShoppingBag, Truck, CheckCircle2, Clock, MapPin, RefreshCw,
-  DollarSign, RotateCcw, Banknote, Package, ChevronDown
+  DollarSign, RotateCcw, Banknote, Package, ChevronDown, AlertTriangle
 } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const STATUS_OPTIONS = [
   { value: 'CONFIRMED',  label: 'Confirm',   className: 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/40 border border-indigo-500/30' },
@@ -29,6 +30,7 @@ const VendorOrdersPage = () => {
   const [salesOrders, setSalesOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [expandedRow, setExpandedRow] = useState(null);
 
   const vendorHeaders = {
@@ -39,11 +41,13 @@ const VendorOrdersPage = () => {
 
   const fetchVendorOrders = async () => {
     setLoading(true);
+    setErrorMsg('');
     try {
       const res = await axiosClient.get('/vendor/orders', vendorHeaders);
       setSalesOrders(res.data);
     } catch (err) {
       console.error('Failed to fetch vendor sales orders', err);
+      setErrorMsg(getErrorMessage(err, 'Failed to load sales orders. Please try refreshing.'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +68,7 @@ const VendorOrdersPage = () => {
       showMessage(`Order #${orderId} status updated to ${newStatus}!`);
       fetchVendorOrders();
     } catch (err) {
-      showMessage('Failed to update order status.');
+      showMessage(getErrorMessage(err, 'Failed to update order status.'));
     }
   };
 
@@ -101,6 +105,13 @@ const VendorOrdersPage = () => {
           </div>
         )}
 
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="flex items-center space-x-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 p-4 rounded-2xl text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
         {loading ? (
           <div className="text-center py-16">
             <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -117,7 +128,7 @@ const VendorOrdersPage = () => {
         ) : (
           <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
+              <table className="w-full text-left border-collapse text-sm min-w-[800px]">
                 <thead>
                   <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
                     <th className="p-4">Item Details</th>

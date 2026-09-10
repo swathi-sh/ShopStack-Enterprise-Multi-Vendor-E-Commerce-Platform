@@ -10,6 +10,7 @@ import {
   fetchAllocations,
   allocateOrder,
   autoAllocateOrder,
+  fetchSuitableWarehousesForOrder,
   fetchStockMovements,
   fetchWarehouseAnalytics,
   fetchWarehouseStaff,
@@ -19,6 +20,7 @@ import {
   clearWarehouseMessage,
 } from '../store/slices/warehouseSlice';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   Warehouse as WarehouseIcon,
   Package,
@@ -100,6 +102,8 @@ const AdminWarehousePage = () => {
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [selectedOrderForAllocation, setSelectedOrderForAllocation] = useState(null);
   const [targetWarehouseId, setTargetWarehouseId] = useState('');
+  const [suitableWarehouses, setSuitableWarehouses] = useState([]);
+  const [loadingSuitable, setLoadingSuitable] = useState(false);
 
   // Filters & Search
   const [movementSearch, setMovementSearch] = useState('');
@@ -125,7 +129,7 @@ const AdminWarehousePage = () => {
       const productsRes = await axiosClient.get('/admin/products');
       setAllProducts(productsRes.data || []);
     } catch (e) {
-      console.error('Failed to fetch admin products', e);
+      // Products fetch failure non-blocking for warehouse ops
     }
   };
 
@@ -697,10 +701,17 @@ const AdminWarehousePage = () => {
                       Auto Allocate
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedOrderForAllocation(order);
-                        setTargetWarehouseId(warehouses[0]?.id || '');
+                        setTargetWarehouseId('');
+                        setSuitableWarehouses([]);
+                        setLoadingSuitable(true);
                         setShowAllocateModal(true);
+                        const result = await dispatch(fetchSuitableWarehousesForOrder(order.id));
+                        const whs = result.payload || [];
+                        setSuitableWarehouses(whs);
+                        if (whs.length > 0) setTargetWarehouseId(String(whs[0].id));
+                        setLoadingSuitable(false);
                       }}
                       className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all cursor-pointer"
                     >
@@ -1065,37 +1076,80 @@ const AdminWarehousePage = () => {
         </div>
       )}
 
-      {/* MODAL: MANUAL ORDER ALLOCATION */}
+      {/* MODAL: MANUAL ORDER ALLOCATION — Shows only warehouses with sufficient stock */}
       {showAllocateModal && selectedOrderForAllocation && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
-            <h3 className="text-lg font-black text-white">
-              Allocate Stock for Order #{selectedOrderForAllocation.id}
-            </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
+            <div>
+              <h3 className="text-lg font-black text-white">
+                Select Warehouse — Order #{selectedOrderForAllocation.id}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Only warehouses with <strong className="text-emerald-400">sufficient stock</strong> for all items in this order are shown.
+              </p>
+            </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Select Target Warehouse</label>
-                <select
-                  value={targetWarehouseId}
-                  onChange={(e) => setTargetWarehouseId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                >
-                  {warehouses
-                    .filter((w) => w.status === 'ACTIVE')
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.code}) - {w.location}
-                      </option>
-                    ))}
-                </select>
-              </div>
+            {/* Order Items Summary */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 space-y-1">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Order Items</p>
+              {selectedOrderForAllocation.items?.map((it) => (
+                <div key={it.id} className="flex items-center justify-between">
+                  <span className="text-xs text-slate-300">{it.productName}</span>
+                  <span className="text-xs font-bold text-amber-400">× {it.quantity}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Warehouse Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-2">Available Warehouses with Sufficient Stock</label>
+              {loadingSuitable ? (
+                <div className="flex items-center justify-center py-6 text-slate-400 text-xs gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Checking warehouse stock levels...
+                </div>
+              ) : suitableWarehouses.length === 0 ? (
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
+                  <AlertTriangle className="w-6 h-6 text-rose-400 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-rose-400">No suitable warehouse found</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    No active warehouse has sufficient stock for all items in this order. Please restock a warehouse first.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {suitableWarehouses.map((w) => (
+                    <label
+                      key={w.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        targetWarehouseId === String(w.id)
+                          ? 'border-indigo-500/50 bg-indigo-500/10'
+                          : 'border-slate-700 bg-slate-950/50 hover:border-slate-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="warehouseSelect"
+                        value={String(w.id)}
+                        checked={targetWarehouseId === String(w.id)}
+                        onChange={(e) => setTargetWarehouseId(e.target.value)}
+                        className="accent-indigo-500"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-white">{w.name}</div>
+                        <div className="text-[11px] text-slate-400">{w.location} · <span className="font-mono text-slate-500">{w.code}</span></div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">Has Stock</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => setShowAllocateModal(false)}
+                onClick={() => { setShowAllocateModal(false); setSelectedOrderForAllocation(null); setSuitableWarehouses([]); }}
                 className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
               >
                 Cancel
@@ -1103,7 +1157,8 @@ const AdminWarehousePage = () => {
               <button
                 type="button"
                 onClick={handleManualAllocate}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-md"
+                disabled={!targetWarehouseId || loadingSuitable || suitableWarehouses.length === 0}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-extrabold shadow-md transition-all"
               >
                 Confirm Allocation
               </button>

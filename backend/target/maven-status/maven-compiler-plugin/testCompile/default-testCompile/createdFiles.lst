@@ -2,3 +2,5 @@ com\shopstack\service\ShipmentServiceImplTest.class
 com\shopstack\service\ReturnServiceImplTest$1.class
 com\shopstack\service\WarehouseServiceImplTest.class
 com\shopstack\service\ReturnServiceImplTest.class
+com\shopstack\service\CartServiceImplTest.class
+com\shopstack\service\OrderServiceImplTest.class

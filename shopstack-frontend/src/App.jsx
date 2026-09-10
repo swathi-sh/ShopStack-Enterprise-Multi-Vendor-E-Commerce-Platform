@@ -149,7 +149,10 @@ function App() {
           {/* Protected Warehouse Staff Routes */}
           <Route element={<ProtectedWarehouseStaffRoute />}>
             <Route element={<WarehouseStaffLayout />}>
+              <Route path="/warehouse-staff" element={<Navigate to="/warehouse-staff/dashboard" replace />} />
               <Route path="/warehouse-staff/dashboard" element={<WarehouseStaffDashboardPage />} />
+              <Route path="/warehouse-staff/qc" element={<WarehouseStaffDashboardPage defaultTab="returns_qc" />} />
+              <Route path="/warehouse-staff/returns" element={<WarehouseStaffDashboardPage defaultTab="returns_qc" />} />
             </Route>
           </Route>
 

@@ -9,6 +9,8 @@ import {
   User, Phone, Home, Building2, Map, Hash, Ticket, Tag, Check, X, Mail
 } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 // Load official Razorpay SDK script dynamically
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -82,7 +84,7 @@ const CheckoutPage = () => {
       const res = await axiosClient.get('/cart');
       dispatch(setCartItems(res.data));
     } catch (err) {
-      setErrorMsg('Failed to load shopping cart. Please try refreshing.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load shopping cart. Please try refreshing.'));
     } finally {
       dispatch(setCartLoading(false));
     }
@@ -149,7 +151,7 @@ const CheckoutPage = () => {
     } catch (err) {
       setAppliedCoupon(null);
       setCouponDiscount(0);
-      setCouponMsg({ type: 'error', text: err.response?.data?.message || 'Failed to validate coupon.' });
+      setCouponMsg({ type: 'error', text: getErrorMessage(err, 'Failed to validate coupon.') });
     } finally {
       setCouponLoading(false);
     }
@@ -241,9 +243,10 @@ const CheckoutPage = () => {
             paymentSucceeded.current = false;
             setPaymentFailed(true);
             setErrorMsg(
-              verifyErr.response?.data?.message ||
-              'Payment was received but order creation failed. Please contact support with payment ID: ' +
-              response.razorpay_payment_id
+              getErrorMessage(
+                verifyErr,
+                'Payment was received but order creation failed. Please contact support with payment ID: ' + response.razorpay_payment_id
+              )
             );
           } finally {
             setPaying(false);
@@ -276,7 +279,7 @@ const CheckoutPage = () => {
     } catch (err) {
       setPaying(false);
       setPaymentFailed(true);
-      setErrorMsg(err.response?.data?.message || err.message || 'Payment initialization failed.');
+      setErrorMsg(getErrorMessage(err, 'Payment initialization failed.'));
     }
   };
 

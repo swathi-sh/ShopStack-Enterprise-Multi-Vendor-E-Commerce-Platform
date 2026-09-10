@@ -26,6 +26,7 @@ public class WarehouseServiceImpl implements WarehouseService {
     private final ReturnRequestRepository returnRequestRepository;
     private final ReturnService returnService;
     private final PasswordEncoder passwordEncoder;
+    private final InventoryHistoryRepository inventoryHistoryRepository;
 
     public WarehouseServiceImpl(WarehouseRepository warehouseRepository,
                                 WarehouseInventoryRepository warehouseInventoryRepository,
@@ -36,7 +37,8 @@ public class WarehouseServiceImpl implements WarehouseService {
                                 CustomerRepository customerRepository,
                                 ReturnRequestRepository returnRequestRepository,
                                 ReturnService returnService,
-                                PasswordEncoder passwordEncoder) {
+                                PasswordEncoder passwordEncoder,
+                                InventoryHistoryRepository inventoryHistoryRepository) {
         this.warehouseRepository = warehouseRepository;
         this.warehouseInventoryRepository = warehouseInventoryRepository;
         this.warehouseOrderAllocationRepository = warehouseOrderAllocationRepository;
@@ -47,6 +49,7 @@ public class WarehouseServiceImpl implements WarehouseService {
         this.returnRequestRepository = returnRequestRepository;
         this.returnService = returnService;
         this.passwordEncoder = passwordEncoder;
+        this.inventoryHistoryRepository = inventoryHistoryRepository;
     }
 
     // ─── Warehouse CRUD ────────────────────────────────────────────────────────
@@ -296,6 +299,32 @@ public class WarehouseServiceImpl implements WarehouseService {
         }
 
         return new ArrayList<>();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WarehouseDTO> getSuitableWarehousesForOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+
+        List<Warehouse> activeWarehouses = warehouseRepository.findByStatus(WarehouseStatus.ACTIVE);
+        List<WarehouseDTO> suitable = new ArrayList<>();
+
+        for (Warehouse wh : activeWarehouses) {
+            boolean hasSufficientStock = true;
+            for (OrderItem item : order.getItems()) {
+                Optional<WarehouseInventory> invOpt = warehouseInventoryRepository
+                        .findByWarehouseIdAndProductId(wh.getId(), item.getProduct().getId());
+                if (invOpt.isEmpty() || invOpt.get().getAvailableQuantity() < item.getQuantity()) {
+                    hasSufficientStock = false;
+                    break;
+                }
+            }
+            if (hasSufficientStock) {
+                suitable.add(new WarehouseDTO(wh));
+            }
+        }
+        return suitable;
     }
 
     @Override
@@ -569,10 +598,18 @@ public class WarehouseServiceImpl implements WarehouseService {
     public List<ReturnRequestDTO> getStaffReturns(Long warehouseId) {
         List<ReturnRequest> allReturns = returnRequestRepository.findAllByOrderByCreatedAtDesc();
         return allReturns.stream()
-                .filter(r -> ReturnStatus.RETURN_APPROVED.equals(r.getReturnStatus()) || ReturnStatus.RETURN_RECEIVED.equals(r.getReturnStatus()) || ReturnStatus.RETURN_ACCEPTED.equals(r.getReturnStatus()))
+                .filter(r -> ReturnStatus.RETURN_APPROVED.equals(r.getReturnStatus()) ||
+                             ReturnStatus.PRODUCT_RETURNED.equals(r.getReturnStatus()) ||
+                             ReturnStatus.RETURN_RECEIVED.equals(r.getReturnStatus()) ||
+                             ReturnStatus.RETURN_ACCEPTED.equals(r.getReturnStatus()) ||
+                             ReturnStatus.RETURN_REJECTED.equals(r.getReturnStatus()))
                 .filter(r -> {
-                    if (warehouseId == null) return true; // admin / global staff sees all
+                    if (warehouseId == null) return true; // global staff / admin view
                     Warehouse assignedWarehouse = r.getOrder() != null ? r.getOrder().getWarehouse() : null;
+                    if (assignedWarehouse == null && r.getOrder() != null) {
+                        assignedWarehouse = warehouseOrderAllocationRepository.findByOrderId(r.getOrder().getId())
+                                .stream().map(WarehouseOrderAllocation::getWarehouse).findFirst().orElse(null);
+                    }
                     return assignedWarehouse != null && assignedWarehouse.getId().equals(warehouseId);
                 })
                 .map(ReturnRequestDTO::new)
@@ -581,23 +618,178 @@ public class WarehouseServiceImpl implements WarehouseService {
 
     @Override
     @Transactional
-    public ReturnRequestDTO processStaffQC(Long returnId, Long staffWarehouseId, AdminReceiveReturnRequest request) {
+    public ReturnRequestDTO processStaffQC(Long returnId, String staffEmail, WarehouseQCRequestDto request) {
+        Customer staff = customerRepository.findByEmail(staffEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff member not found with email: " + staffEmail));
+
+        // Enforce role check: Admin cannot perform QC
+        if (!Role.WAREHOUSE_STAFF.equals(staff.getRole())) {
+            throw new IllegalStateException("Admin is not permitted to perform Quality Control (QC). Quality Control must be performed by assigned Warehouse Staff.");
+        }
+
+        Warehouse staffWarehouse = staff.getWarehouse();
+        if (staffWarehouse == null) {
+            throw new IllegalStateException("You are not assigned to any warehouse. QC can only be performed by warehouse staff.");
+        }
+
         ReturnRequest r = returnRequestRepository.findById(returnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Return request not found with ID: " + returnId));
 
-        if (staffWarehouseId != null) {
-            Warehouse assignedWarehouse = r.getOrder() != null ? r.getOrder().getWarehouse() : null;
-            if (assignedWarehouse != null && !assignedWarehouse.getId().equals(staffWarehouseId)) {
-                throw new IllegalStateException("Access denied: Return #" + returnId + " is assigned to warehouse '" +
-                        assignedWarehouse.getName() + "' and cannot be received at your warehouse.");
-            }
-            if (request.getWarehouseId() == null) {
-                request.setWarehouseId(staffWarehouseId);
-            }
-        } else if (request.getWarehouseId() == null && r.getOrder() != null && r.getOrder().getWarehouse() != null) {
-            request.setWarehouseId(r.getOrder().getWarehouse().getId());
+        if (!ReturnStatus.RETURN_APPROVED.equals(r.getReturnStatus()) &&
+            !ReturnStatus.PRODUCT_RETURNED.equals(r.getReturnStatus()) &&
+            !ReturnStatus.RETURN_RECEIVED.equals(r.getReturnStatus())) {
+            throw new IllegalStateException("Only approved or returned requests can undergo Quality Control (QC). Current status: " + r.getReturnStatus());
         }
 
-        return returnService.receiveReturn(returnId, request);
+        Order order = r.getOrder();
+        Warehouse assignedWarehouse = order != null ? order.getWarehouse() : null;
+        if (assignedWarehouse == null && order != null) {
+            assignedWarehouse = warehouseOrderAllocationRepository.findByOrderId(order.getId())
+                    .stream().map(WarehouseOrderAllocation::getWarehouse).findFirst().orElse(null);
+            if (assignedWarehouse != null) {
+                order.setWarehouse(assignedWarehouse);
+                orderRepository.save(order);
+            }
+        }
+
+        // Enforce warehouse routing boundary: Only staff of the assigned warehouse can perform QC
+        if (assignedWarehouse != null && !assignedWarehouse.getId().equals(staffWarehouse.getId())) {
+            throw new IllegalStateException("Access denied: Return #" + returnId + " is assigned to warehouse '" +
+                    assignedWarehouse.getName() + "' and cannot be received or QC'd at your warehouse ('" + staffWarehouse.getName() + "').");
+        }
+
+        Product product = r.getOrderItem().getProduct();
+        int returnQty = r.getQuantity();
+        QCResult qcResult = request.getQcResult();
+
+        if (qcResult == null) {
+            throw new IllegalArgumentException("QC Result is required (PASSED, DAMAGED, or FAILED).");
+        }
+
+        // Record QC audit metadata
+        r.setQcResult(qcResult);
+        r.setQcStaff(staff);
+        r.setQcDate(java.time.LocalDateTime.now());
+        r.setDamageDescription(request.getDamageDescription());
+        r.setRestockWarehouse(staffWarehouse);
+
+        if (QCResult.PASSED.equals(qcResult)) {
+            // PASSED: product in good condition -> restock into available stock
+            r.setIsUsable(true);
+            WarehouseInventory inventory = warehouseInventoryRepository
+                    .findByWarehouseIdAndProductId(staffWarehouse.getId(), product.getId())
+                    .orElseGet(() -> new WarehouseInventory(staffWarehouse, product, 0, 0));
+
+            inventory.setAvailableQuantity(inventory.getAvailableQuantity() + returnQty);
+            warehouseInventoryRepository.save(inventory);
+
+            // Sync global product stock
+            int totalAvail = warehouseInventoryRepository.findByProductId(product.getId())
+                    .stream().mapToInt(WarehouseInventory::getAvailableQuantity).sum();
+            product.setStockQuantity(totalAvail);
+            productRepository.save(product);
+
+            // Audit logs
+            InventoryHistory history = new InventoryHistory(product, returnQty, totalAvail, "RETURN_RESTOCK");
+            inventoryHistoryRepository.save(history);
+
+            StockMovementLog log = new StockMovementLog(
+                    product, staffWarehouse, order,
+                    "RETURNED_USABLE", "AVAILABLE",
+                    StockMovementStage.RETURNED_USABLE,
+                    returnQty,
+                    "QC PASSED: Product restocked for Return #" + returnId + " by " + staff.getName());
+            stockMovementLogRepository.save(log);
+
+            r.setReturnStatus(ReturnStatus.RETURN_ACCEPTED);
+
+        } else if (QCResult.DAMAGED.equals(qcResult)) {
+            // DAMAGED: record damage attributes & quarantine stock
+            r.setIsUsable(false);
+            DamageType dType = request.getDamageType() != null ? request.getDamageType() : DamageType.OTHER;
+            DamageResponsibility dResp = request.getDamageResponsibility() != null ? request.getDamageResponsibility() : DamageResponsibility.UNKNOWN;
+
+            r.setDamageType(dType);
+            r.setDamageResponsibility(dResp);
+
+            WarehouseInventory inventory = warehouseInventoryRepository
+                    .findByWarehouseIdAndProductId(staffWarehouse.getId(), product.getId())
+                    .orElseGet(() -> new WarehouseInventory(staffWarehouse, product, 0, 0));
+            inventory.setDamagedQuantity(inventory.getDamagedQuantity() + returnQty);
+            warehouseInventoryRepository.save(inventory);
+
+            StockMovementLog log = new StockMovementLog(
+                    product, staffWarehouse, order,
+                    "RETURNED_DAMAGED", "DAMAGED_QUARANTINE",
+                    StockMovementStage.RETURNED_DAMAGED,
+                    returnQty,
+                    "QC DAMAGED (" + dType + ", Resp: " + dResp + "): Quarantined for Return #" + returnId + " by " + staff.getName());
+            stockMovementLogRepository.save(log);
+
+            // Refund policy decision based on responsibility
+            if (DamageResponsibility.CUSTOMER.equals(dResp)) {
+                // Damaged by customer: reject return & refund per policy
+                r.setReturnStatus(ReturnStatus.RETURN_REJECTED);
+                r.setAdminNotes("QC DAMAGED: Product damaged by customer. Return rejected per policy.");
+                if (order != null) {
+                    order.setStatus(OrderStatus.DELIVERED);
+                    orderRepository.save(order);
+                }
+            } else {
+                // Damaged before/during delivery (SELLER, COURIER, UNKNOWN): accept return for refund
+                r.setReturnStatus(ReturnStatus.RETURN_ACCEPTED);
+                r.setAdminNotes("QC DAMAGED (" + dResp + "): Return accepted for refund per damage policy.");
+            }
+
+        } else if (QCResult.FAILED.equals(qcResult)) {
+            // FAILED: Return conditions not satisfied -> reject return
+            r.setIsUsable(false);
+            r.setReturnStatus(ReturnStatus.RETURN_REJECTED);
+            r.setAdminNotes("QC FAILED: Return conditions not met (" + (request.getDamageDescription() != null ? request.getDamageDescription() : "Failed inspection") + ").");
+            if (order != null) {
+                order.setStatus(OrderStatus.DELIVERED);
+                orderRepository.save(order);
+            }
+        }
+
+        return new ReturnRequestDTO(returnRequestRepository.save(r));
+    }
+
+    @Override
+    @Transactional
+    public ReturnRequestDTO processStaffQC(Long returnId, Long staffWarehouseId, AdminReceiveReturnRequest request) {
+        WarehouseQCRequestDto qcDto = new WarehouseQCRequestDto();
+        qcDto.setQcResult(Boolean.TRUE.equals(request.getIsUsable()) ? QCResult.PASSED : QCResult.DAMAGED);
+        qcDto.setDamageDescription(request.getAdminNotes());
+        qcDto.setDamageResponsibility(DamageResponsibility.UNKNOWN);
+
+        ReturnRequest r = returnRequestRepository.findById(returnId)
+                .orElseThrow(() -> new ResourceNotFoundException("Return request not found with ID: " + returnId));
+
+        Warehouse assignedWarehouse = r.getOrder() != null ? r.getOrder().getWarehouse() : null;
+        Long targetWhId = staffWarehouseId != null ? staffWarehouseId : (assignedWarehouse != null ? assignedWarehouse.getId() : null);
+
+        if (targetWhId == null) {
+            List<Warehouse> active = warehouseRepository.findByStatus(WarehouseStatus.ACTIVE);
+            if (!active.isEmpty()) targetWhId = active.get(0).getId();
+        }
+
+        // Fallback for legacy requests finding first staff of target warehouse
+        List<Customer> staffList = customerRepository.findByRole(Role.WAREHOUSE_STAFF);
+        String staffEmail = null;
+        for (Customer c : staffList) {
+            if (c.getWarehouse() != null && targetWhId != null && c.getWarehouse().getId().equals(targetWhId)) {
+                staffEmail = c.getEmail();
+                break;
+            }
+        }
+        if (staffEmail == null && !staffList.isEmpty()) {
+            staffEmail = staffList.get(0).getEmail();
+        }
+        if (staffEmail == null) {
+            throw new IllegalStateException("No warehouse staff available to perform QC.");
+        }
+
+        return processStaffQC(returnId, staffEmail, qcDto);
     }
 }

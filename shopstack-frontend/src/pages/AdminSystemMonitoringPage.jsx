@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import {
   Activity,
   Database,
@@ -28,7 +29,7 @@ const AdminSystemMonitoringPage = () => {
       setHealth(res.data);
       setLastRefreshed(new Date());
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load system health.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load system health.'));
     } finally {
       setLoading(false);
     }

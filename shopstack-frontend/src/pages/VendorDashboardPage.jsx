@@ -22,9 +22,11 @@ const VendorDashboardPage = () => {
   const [analytics, setAnalytics] = useState(null);
   const [earnings, setEarnings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const [analyticsRes, earningsRes] = await Promise.all([
         axiosClient.get('/vendor/dashboard'),
@@ -34,6 +36,7 @@ const VendorDashboardPage = () => {
       setEarnings(earningsRes.data);
     } catch (err) {
       console.error('Failed to fetch vendor data', err);
+      setFetchError(err.response?.data?.message || 'Failed to load dashboard data. Please try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -61,6 +64,14 @@ const VendorDashboardPage = () => {
             </p>
           </div>
         </div>
+
+        {/* Error Banner */}
+        {fetchError && (
+          <div className="flex items-center space-x-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 p-4 rounded-2xl text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{fetchError}</span>
+          </div>
+        )}
 
         {/* Quick Refresh */}
         <div className="flex items-center justify-between">

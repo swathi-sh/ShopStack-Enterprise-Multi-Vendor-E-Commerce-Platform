@@ -20,6 +20,7 @@ public interface WarehouseService {
     List<WarehouseOrderAllocationDTO> autoAllocateOrderIfPossible(Long orderId);
     List<WarehouseOrderAllocationDTO> getAllAllocations();
     List<OrderDTO> getUnallocatedOrders();
+    List<WarehouseDTO> getSuitableWarehousesForOrder(Long orderId);
 
     // Staff: warehouse-scoped operations
     List<WarehouseOrderAllocationDTO> getAllocationsByWarehouse(Long warehouseId);
@@ -34,6 +35,7 @@ public interface WarehouseService {
 
     // Staff: Return & QC operations
     List<ReturnRequestDTO> getStaffReturns(Long warehouseId);
+    ReturnRequestDTO processStaffQC(Long returnId, String staffEmail, WarehouseQCRequestDto request);
     ReturnRequestDTO processStaffQC(Long returnId, Long staffWarehouseId, AdminReceiveReturnRequest request);
 
     // Staff management (admin-only)

@@ -105,11 +105,14 @@ public class WarehouseStaffController {
     }
 
     @PostMapping("/returns/{id}/qc")
+    @PreAuthorize("hasRole('WAREHOUSE_STAFF')")
     public ResponseEntity<ReturnRequestDTO> processStaffQC(
             @PathVariable Long id,
-            @RequestBody AdminReceiveReturnRequest request,
+            @jakarta.validation.Valid @RequestBody WarehouseQCRequestDto request,
             Principal principal) {
-        WarehouseStaffDTO staff = getStaffProfile(principal);
-        return ResponseEntity.ok(warehouseService.processStaffQC(id, staff.getWarehouseId(), request));
+        if (principal == null) {
+            throw new IllegalStateException("Unauthenticated user.");
+        }
+        return ResponseEntity.ok(warehouseService.processStaffQC(id, principal.getName(), request));
     }
 }

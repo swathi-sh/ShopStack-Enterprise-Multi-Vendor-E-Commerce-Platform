@@ -5,6 +5,7 @@ import {
   Package, Search, Filter, User, Store, Warehouse, Banknote,
   ChevronDown, Loader2, Eye, ArrowRight, ShieldCheck, Clock
 } from 'lucide-react';
+import { getErrorMessage } from '../api/errorUtils';
 
 const RETURN_STATUSES = [
   'ALL',
@@ -54,7 +55,7 @@ const ReviewPanel = ({ returnId, onDone, onError }) => {
       await axiosClient.put(`/returns/admin/${returnId}/review`, { action, adminNotes: notes });
       onDone(`Return request ${action.toLowerCase()}d successfully.`);
     } catch (err) {
-      onError(err.response?.data?.message || err.response?.data || err.message || 'Action failed.');
+      onError(getErrorMessage(err, 'Action failed.'));
     } finally {
       setLoading(false);
     }
@@ -104,103 +105,6 @@ const ReviewPanel = ({ returnId, onDone, onError }) => {
   );
 };
 
-const ReceivePanel = ({ returnId, warehouses, onDone, onError }) => {
-  const [isUsable, setIsUsable] = useState(null);
-  const [warehouseId, setWarehouseId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async () => {
-    if (isUsable === null) return;
-    if (isUsable && !warehouseId) return;
-    setLoading(true);
-    try {
-      await axiosClient.put(`/returns/admin/${returnId}/receive`, {
-        isUsable,
-        warehouseId: isUsable ? parseInt(warehouseId) : null,
-        adminNotes: notes,
-      });
-      onDone('Product received and inventory updated.');
-    } catch (err) {
-      onError(err.response?.data?.message || err.response?.data || err.message || 'Receive failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3 p-4 bg-slate-950/60 rounded-2xl border border-slate-800">
-      <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">Mark Product Received</p>
-      <p className="text-xs text-slate-400">Is the returned product in usable condition?</p>
-      <div className="flex gap-2">
-        <button
-          onClick={() => setIsUsable(true)}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-            isUsable === true
-              ? 'bg-emerald-600 border-emerald-500 text-white'
-              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-          }`}
-        >
-          <CheckCircle className="w-3.5 h-3.5" /> Usable – Restock
-        </button>
-        <button
-          onClick={() => { setIsUsable(false); setWarehouseId(''); }}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-            isUsable === false
-              ? 'bg-rose-600 border-rose-500 text-white'
-              : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
-          }`}
-        >
-          <XCircle className="w-3.5 h-3.5" /> Damaged – Discard
-        </button>
-      </div>
-
-      {isUsable === true && (
-        <div>
-          <label className="block text-xs font-bold text-slate-400 mb-1">Restock Warehouse</label>
-          <div className="relative">
-            <select
-              value={warehouseId}
-              onChange={e => setWarehouseId(e.target.value)}
-              required
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 pr-9 focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer"
-            >
-              <option value="">— Select warehouse —</option>
-              {warehouses.map(w => (
-                <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-          </div>
-        </div>
-      )}
-
-      {isUsable === false && (
-        <div className="flex items-start gap-2 p-3 bg-rose-500/5 border border-rose-500/20 rounded-xl">
-          <AlertTriangle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
-          <p className="text-[10px] text-rose-300">Product will be marked as damaged. No inventory will be updated.</p>
-        </div>
-      )}
-
-      <textarea
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        placeholder="Inspection notes (optional)..."
-        rows={2}
-        className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500 resize-none"
-      />
-      <button
-        onClick={handleSubmit}
-        disabled={isUsable === null || (isUsable && !warehouseId) || loading}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-      >
-        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Warehouse className="w-3.5 h-3.5" />}
-        {loading ? 'Processing...' : 'Confirm Receipt'}
-      </button>
-    </div>
-  );
-};
-
 const RefundPanel = ({ returnItem, onDone, onError }) => {
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -211,8 +115,7 @@ const RefundPanel = ({ returnItem, onDone, onError }) => {
       await axiosClient.post(`/returns/admin/${returnItem.id}/refund`);
       onDone('Refund processed successfully via Razorpay.');
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || err.response?.data || err.message || 'Refund failed.';
-      onError(msg);
+      onError(getErrorMessage(err, 'Refund failed.'));
     } finally {
       setLoading(false);
     }
@@ -374,18 +277,48 @@ const ReturnDetailModal = ({ returnItem, warehouses, onClose, onRefresh }) => {
           </div>
         )}
 
-        {returnItem.restockWarehouseName && (
-          <div className="flex items-center gap-2 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-xs">
-            <Warehouse className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-slate-400">Restocked to:</span>
-            <span className="font-bold text-emerald-400">{returnItem.restockWarehouseName}</span>
-            {returnItem.isUsable === false && <span className="text-rose-400 font-bold">Damaged – Not restocked</span>}
-          </div>
-        )}
-        {returnItem.isUsable === false && !returnItem.restockWarehouseName && rs !== 'RETURN_REQUESTED' && rs !== 'RETURN_APPROVED' && (
-          <div className="flex items-center gap-2 p-3 bg-rose-500/5 border border-rose-500/20 rounded-xl text-xs">
-            <XCircle className="w-3.5 h-3.5 text-rose-400" />
-            <span className="text-rose-300">Product marked as damaged – Not restocked</span>
+        {/* QC Audit Summary (if completed) */}
+        {(returnItem.qcResult || returnItem.isUsable !== null || returnItem.damageType) && (
+          <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-bold text-slate-200">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                Warehouse QC Audit Summary
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-md font-extrabold text-[10px] ${
+                returnItem.qcResult === 'PASSED' || returnItem.isUsable === true ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                returnItem.qcResult === 'DAMAGED' || returnItem.isUsable === false ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}>
+                QC RESULT: {returnItem.qcResult || (returnItem.isUsable ? 'PASSED' : 'DAMAGED')}
+              </span>
+            </div>
+
+            {returnItem.qcResult === 'DAMAGED' && (
+              <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-950 rounded-lg text-[11px]">
+                <div>
+                  <span className="text-slate-500 block">Damage Type</span>
+                  <span className="font-bold text-amber-400">{returnItem.damageType || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Damage Responsibility</span>
+                  <span className={`font-bold ${returnItem.damageResponsibility === 'CUSTOMER' ? 'text-rose-400' : 'text-cyan-400'}`}>
+                    {returnItem.damageResponsibility || 'UNKNOWN'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {returnItem.damageDescription && (
+              <p className="text-slate-300 italic text-[11px]">
+                QC Remarks: "{returnItem.damageDescription}"
+              </p>
+            )}
+
+            <div className="text-[10px] text-slate-500 flex justify-between border-t border-slate-800 pt-2">
+              <span>QC Inspector: <strong className="text-slate-400">{returnItem.qcStaffName || returnItem.qcStaffEmail || 'Warehouse Staff'}</strong></span>
+              <span>Date: {returnItem.qcDate ? new Date(returnItem.qcDate).toLocaleString('en-IN') : 'N/A'}</span>
+            </div>
           </div>
         )}
 
@@ -395,7 +328,16 @@ const ReturnDetailModal = ({ returnItem, warehouses, onClose, onRefresh }) => {
         )}
 
         {rs === 'RETURN_APPROVED' && (
-          <ReceivePanel returnId={returnItem.id} warehouses={warehouses} onDone={handleDone} onError={handleError} />
+          <div className="flex items-start gap-3 p-3.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-xs">
+            <Warehouse className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-blue-300">Return Routed to Warehouse Intake</p>
+              <p className="text-blue-200/80 text-[11px] mt-0.5">
+                Assigned Warehouse: <strong className="text-white">{returnItem.assignedWarehouseName || 'Order Warehouse'}</strong>.
+                Awaiting physical product arrival & Quality Control (QC) inspection by assigned Warehouse Staff. Admin does not perform QC.
+              </p>
+            </div>
+          </div>
         )}
 
         {rs === 'RETURN_ACCEPTED' && (

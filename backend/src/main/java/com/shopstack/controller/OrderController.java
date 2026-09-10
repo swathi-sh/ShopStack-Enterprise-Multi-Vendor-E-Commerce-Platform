@@ -7,6 +7,7 @@ import com.shopstack.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,10 +40,19 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderDTO> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         OrderStatus status = OrderStatus.valueOf(body.get("status").toUpperCase());
         return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<OrderDTO> cancelOrder(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.cancelOrder(id, email));
     }
 }

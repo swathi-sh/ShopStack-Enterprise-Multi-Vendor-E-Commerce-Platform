@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
+import { getErrorMessage } from '../api/errorUtils';
 import { fetchCategories, fetchCatalogProducts, setFilters, resetFilters } from '../store/slices/productSlice';
 import { setCartItems } from '../store/slices/cartSlice';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
@@ -165,10 +166,6 @@ const ProductCatalogPage = () => {
 
   // Handle quick category pill click
   const handleQuickCatClick = (catLabel) => {
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     setCurrentPage(0);
 
     if (catLabel === 'All') {
@@ -195,10 +192,6 @@ const ProductCatalogPage = () => {
   };
 
   const handleCategorySelectChange = (e) => {
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     const val = e.target.value;
     setSelectedCat(val);
     setCurrentPage(0);
@@ -216,20 +209,12 @@ const ProductCatalogPage = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     setCurrentPage(0);
     updateQueryParams({ search: searchTerm, page: 0 });
     loadProducts(selectedCat, brandFilter, searchTerm, minPrice, maxPrice, ratingFilter, sortBy, 0);
   };
 
   const handleResetFilters = () => {
-    if (!isAuthenticated) {
-      navigate('/auth');
-      return;
-    }
     setSearchTerm('');
     setSelectedCat('');
     setBrandFilter('');
@@ -255,7 +240,7 @@ const ProductCatalogPage = () => {
       dispatch(setCartItems(cartRes.data));
       showToast('Product added to cart!');
     } catch (err) {
-      showToast('Please sign in as customer to add items to cart.');
+      showToast(getErrorMessage(err, 'Failed to add item to cart.'));
     }
   };
 
@@ -270,7 +255,7 @@ const ProductCatalogPage = () => {
       dispatch(setWishlistItems(wishRes.data));
       showToast('Saved to your wishlist!');
     } catch (err) {
-      showToast('Please sign in to manage wishlist.');
+      showToast(getErrorMessage(err, 'Failed to save to wishlist.'));
     }
   };
 

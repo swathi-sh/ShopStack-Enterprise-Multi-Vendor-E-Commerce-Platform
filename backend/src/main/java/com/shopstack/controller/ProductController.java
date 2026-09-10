@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -104,16 +105,19 @@ public class ProductController {
     }
 
     @GetMapping("/pending")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ProductDTO>> getPendingProducts() {
         return ResponseEntity.ok(productService.getPendingProducts());
     }
 
     @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductDTO> approveProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.updateApprovalStatus(id, ApprovalStatus.APPROVED));
     }
 
     @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductDTO> rejectProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.updateApprovalStatus(id, ApprovalStatus.REJECTED));
     }

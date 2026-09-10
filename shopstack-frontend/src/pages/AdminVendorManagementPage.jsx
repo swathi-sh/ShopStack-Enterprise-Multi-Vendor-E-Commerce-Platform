@@ -16,6 +16,8 @@ import {
   Search,
 } from 'lucide-react';
 
+import { getErrorMessage } from '../api/errorUtils';
+
 const AdminVendorManagementPage = () => {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ const AdminVendorManagementPage = () => {
       const res = await axiosClient.get('/admin/vendors');
       setVendors(res.data);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to load vendors.');
+      setErrorMsg(getErrorMessage(err, 'Failed to load vendors.'));
     } finally {
       setLoading(false);
     }
@@ -50,7 +52,7 @@ const AdminVendorManagementPage = () => {
         prev.map((v) => (v.vendorId === vendorId ? { ...v, active: res.data.active } : v))
       );
     } catch (err) {
-      alert('Failed to toggle vendor status.');
+      alert(getErrorMessage(err, 'Failed to toggle vendor status.'));
     } finally {
       setTogglingId(null);
     }
