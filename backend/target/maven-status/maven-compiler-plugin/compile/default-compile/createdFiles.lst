@@ -92,6 +92,7 @@ com\shopstack\dto\VerifyPaymentRequest.class
 com\shopstack\entity\QCResult.class
 com\shopstack\dto\ProductReviewRequest.class
 com\shopstack\service\PaymentService.class
+com\shopstack\config\DatabaseConfig.class
 com\shopstack\service\CategoryServiceImpl.class
 com\shopstack\entity\Customer.class
 com\shopstack\service\CustomerService.class

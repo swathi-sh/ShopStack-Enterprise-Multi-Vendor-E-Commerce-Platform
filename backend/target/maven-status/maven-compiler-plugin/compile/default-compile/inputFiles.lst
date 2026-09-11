@@ -155,6 +155,7 @@ D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\CartCon
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\entity\DamageType.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\exception\CustomerAlreadyExistsException.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\RegisterRequest.java
+D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\config\DatabaseConfig.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\service\PaymentServiceImpl.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\dto\CreateShipmentRequest.java
 D:\ecommerce\dd\ShopStack\backend\src\main\java\com\shopstack\controller\AuthController.java
