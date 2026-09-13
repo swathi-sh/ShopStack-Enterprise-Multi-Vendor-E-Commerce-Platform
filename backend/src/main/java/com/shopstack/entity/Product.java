@@ -43,7 +43,7 @@ public class Product {
     @JoinColumn(name = "vendor_id", nullable = false)
     private Vendor vendor;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "image_url")
     private List<String> images = new ArrayList<>();
