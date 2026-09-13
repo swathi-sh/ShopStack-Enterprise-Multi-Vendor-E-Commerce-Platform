@@ -4,6 +4,7 @@ import com.shopstack.entity.ApprovalStatus;
 import com.shopstack.entity.Product;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ProductDTO {
@@ -39,7 +40,7 @@ public class ProductDTO {
         this.stockQuantity = product.getStockQuantity();
         this.category = product.getCategory() != null ? new CategoryDTO(product.getCategory()) : null;
         this.vendor = product.getVendor() != null ? new VendorDTO(product.getVendor()) : null;
-        this.images = product.getImages();
+        this.images = product.getImages() != null ? new ArrayList<>(product.getImages()) : new ArrayList<>();
         this.approvalStatus = product.getApprovalStatus();
         this.rating = product.getRating();
         this.reviewCount = product.getReviewCount();
